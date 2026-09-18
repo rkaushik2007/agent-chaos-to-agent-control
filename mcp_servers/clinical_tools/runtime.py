@@ -10,50 +10,17 @@ or a separate shell.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import socket
 from collections.abc import AsyncIterator
 
-import uvicorn
+from hosting import serve_asgi
 
-from .server import mcp, reset_state
-
-
-def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return int(s.getsockname()[1])
+from .server import build_server, reset_state
 
 
 @contextlib.asynccontextmanager
-async def clinical_tools_server(port: int | None = None) -> AsyncIterator[str]:
+async def clinical_tools_server() -> AsyncIterator[str]:
     """Start the MCP server and yield its streamable-HTTP endpoint URL."""
     reset_state()
-    port = port or _free_port()
-    config = uvicorn.Config(
-        mcp.streamable_http_app(),
-        host="127.0.0.1",
-        port=port,
-        log_level="error",
-        access_log=False,
-    )
-    server = uvicorn.Server(config)
-    task = asyncio.create_task(server.serve())
-    try:
-        # uvicorn flips `started` once the socket is accepting connections.
-        for _ in range(200):
-            if server.started:
-                break
-            await asyncio.sleep(0.02)
-        else:
-            raise RuntimeError("clinical-tools MCP server did not start in time")
-        yield f"http://127.0.0.1:{port}/mcp"
-    finally:
-        server.should_exit = True
-        with contextlib.suppress(asyncio.TimeoutError, asyncio.CancelledError):
-            await asyncio.wait_for(task, timeout=5)
-        if not task.done():
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+    async with serve_asgi(build_server().streamable_http_app()) as base_url:
+        yield f"{base_url}/mcp"

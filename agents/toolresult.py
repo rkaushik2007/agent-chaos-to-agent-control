@@ -14,7 +14,7 @@ from typing import Any
 def as_text(result: Any, *, limit: int | None = None) -> str:
     text = _unwrap_structured(_flatten(result).strip())
     if limit is not None and len(text) > limit:
-        text = text[: limit - 1].rstrip() + "…"
+        text = text[: limit - 3].rstrip() + "..."
     return text
 
 

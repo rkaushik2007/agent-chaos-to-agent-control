@@ -8,10 +8,20 @@ dim text, no 8-bit greys.
 
 from __future__ import annotations
 
+import sys
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+
+# Windows terminals still default to a legacy code page, which turns rich's box
+# characters and its truncation ellipsis into replacement glyphs on a projector.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):  # pragma: no cover - non-reconfigurable stream
+        pass
 
 console = Console(highlight=False, soft_wrap=False)
 

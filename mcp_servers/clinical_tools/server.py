@@ -49,10 +49,6 @@ def purchase_orders() -> list[dict[str, Any]]:
     return list(_PURCHASE_ORDERS)
 
 
-mcp = FastMCP(name=SERVER_NAME)
-
-
-@mcp.tool()
 def search_docs(query: str) -> str:
     """Search Helix protocol documents for a phrase. Classification: internal."""
     needle = query.strip().lower()
@@ -65,7 +61,6 @@ def search_docs(query: str) -> str:
     return "\n".join(f"{d['doc_id']} [{d['section']}] {d['text']}" for d in hits)
 
 
-@mcp.tool()
 def read_case(case_id: str) -> str:
     """Read one adverse event case record. Classification: phi."""
     case = _CASES.get(case_id.strip().upper())
@@ -74,7 +69,6 @@ def read_case(case_id: str) -> str:
     return json.dumps(case, indent=2)
 
 
-@mcp.tool()
 def update_case(case_id: str, field: str, value: str) -> str:
     """Update one field on an adverse event case record. Classification: phi."""
     key = case_id.strip().upper()
@@ -88,7 +82,6 @@ def update_case(case_id: str, field: str, value: str) -> str:
     return f"Case {key}: {field} changed from {before!r} to {value!r}."
 
 
-@mcp.tool()
 def create_po(vendor: str, item: str, qty: int) -> str:
     """Raise a purchase order for trial supplies. Classification: financial."""
     po_id = f"PO-{5000 + len(_PURCHASE_ORDERS) + 1}"
@@ -96,7 +89,6 @@ def create_po(vendor: str, item: str, qty: int) -> str:
     return f"{po_id} raised: {qty} x {item} from {vendor}."
 
 
-@mcp.tool()
 def lookup_supplier(query: str) -> str:
     """Look up an approved supplier by id or category. Classification: financial."""
     needle = query.strip().lower()
@@ -115,5 +107,29 @@ def lookup_supplier(query: str) -> str:
     )
 
 
+TOOLS = (search_docs, read_case, update_case, create_po, lookup_supplier)
+
+
+def build_server() -> FastMCP:
+    """Build a fresh server instance.
+
+    A `FastMCP` caches its streamable-HTTP session manager, and a session
+    manager can only be run once. Re-using one module-level instance therefore
+    works for the first server start in a process and fails for every one after
+    it - which is exactly what a test suite, and a rehearsal that runs four acts
+    back to back, will do. So each start gets its own instance.
+    """
+    # Stateless: every request is self-contained. The default stateful mode
+    # keeps a per-session task group alive with a 30-minute idle timeout, which
+    # accumulates across the repeated server starts a rehearsal makes and
+    # eventually leaves a server that accepts connections but never answers.
+    # Nothing here needs session state, and MCP `_meta` trace propagation is
+    # per-request, so statelessness costs the demo nothing.
+    server = FastMCP(name=SERVER_NAME, stateless_http=True)
+    for fn in TOOLS:
+        server.tool()(fn)
+    return server
+
+
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    build_server().run(transport="streamable-http")
