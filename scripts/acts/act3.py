@@ -75,8 +75,8 @@ def _status(case_id: str) -> str:
 async def run(*, interactive: bool = True) -> ActResult:
     result = ActResult(act=3, name="Enforcement")
     reg = registry()
+    # Default on, but never override somebody who turned it off on purpose.
     os.environ.setdefault("ENABLE_INSTRUMENTATION", "true")
-    os.environ["ENABLE_INSTRUMENTATION"] = "true"
     telemetry.configure(service_name="helix-agent-governance")
 
     identity = (

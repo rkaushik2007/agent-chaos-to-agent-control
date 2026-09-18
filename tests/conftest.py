@@ -15,12 +15,18 @@ import pytest
 from governance import audit
 from governance.approvals import approval_queue
 from mcp_servers.clinical_tools import server as clinical_tools
+from scripts.logging_setup import quiet
 
 # Telemetry is off for the suite. The acts turn it on; the tests assert on
 # decisions, and an exporter trying to reach a collector that is not running
 # only adds seconds.
 os.environ.setdefault("ENABLE_INSTRUMENTATION", "false")
 os.environ.setdefault("DEMO_MODE", "mock")
+
+# The acts silence transport and exporter chatter; the suite runs the same
+# acts, so it needs the same silencing or a missing collector fills the
+# output with retries.
+quiet()
 
 
 @pytest.fixture(autouse=True)

@@ -53,7 +53,8 @@ async def run(*, interactive: bool = True) -> ActResult:
     result = ActResult(act=4, name="Visibility")
     reg = registry()
 
-    os.environ["ENABLE_INSTRUMENTATION"] = "true"
+    # Default on, but never override somebody who turned it off on purpose.
+    os.environ.setdefault("ENABLE_INSTRUMENTATION", "true")
     os.environ.setdefault("ENABLE_SENSITIVE_DATA", "true")
     os.environ["APPROVAL_TIMEOUT_SECONDS"] = os.getenv("ACT4_APPROVAL_TIMEOUT", DEFAULT_TIMEOUT)
     exporting = telemetry.configure(service_name=os.getenv("OTEL_SERVICE_NAME",

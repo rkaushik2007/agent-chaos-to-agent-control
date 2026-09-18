@@ -52,8 +52,20 @@ def _ensure_chaos_env() -> list[str]:
 async def run(*, interactive: bool = True) -> ActResult:
     result = ActResult(act=1, name="Chaos")
 
-    # Telemetry is genuinely off in act 1, not merely unexported.
+    # Telemetry is genuinely off in act 1, not merely unexported. Restored on
+    # the way out so a rehearsal's later acts are not silently left blind.
+    previous_instrumentation = os.environ.get("ENABLE_INSTRUMENTATION")
     os.environ["ENABLE_INSTRUMENTATION"] = "false"
+    try:
+        return await _chaos(result)
+    finally:
+        if previous_instrumentation is None:
+            os.environ.pop("ENABLE_INSTRUMENTATION", None)
+        else:
+            os.environ["ENABLE_INSTRUMENTATION"] = previous_instrumentation
+
+
+async def _chaos(result: ActResult) -> ActResult:
 
     narrate.act_title(
         1,

@@ -65,6 +65,7 @@ packages = ["agents", "governance", "console", "hosting", "mcp_servers", "remote
 asyncio_mode = "auto"
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = ["slow: runs whole acts end to end (the rehearsal)"]
 
 [tool.uv]
 # Several Agent Framework integration packages (a2a, foundry-hosting) and their
