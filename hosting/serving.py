@@ -54,10 +54,22 @@ def bind_loopback() -> socket.socket:
 
 
 @contextlib.asynccontextmanager
-async def serve_asgi(app) -> AsyncIterator[str]:
-    """Serve `app` on loopback in a background thread, yielding its base URL."""
+async def serve_asgi(app=None, *, app_factory=None) -> AsyncIterator[str]:
+    """Serve an ASGI app on loopback in a background thread, yielding its base URL.
+
+    Pass `app_factory` instead of `app` for a service that must embed its own
+    address in what it serves - an A2A agent card, for instance. The socket is
+    bound first, so the factory receives a URL that is already real and there is
+    no second bind to race with. ASGI apps are themselves callable, so this is an
+    explicit argument rather than a guess about what was passed.
+    """
+    if (app is None) == (app_factory is None):
+        raise TypeError("serve_asgi takes exactly one of `app` or `app_factory`")
+
     sock = bind_loopback()
     host, port = sock.getsockname()[:2]
+    if app_factory is not None:
+        app = app_factory(f"http://{host}:{port}")
 
     server = uvicorn.Server(
         uvicorn.Config(

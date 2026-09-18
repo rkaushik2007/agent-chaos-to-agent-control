@@ -48,7 +48,9 @@ agents:
 # true, not the network.
 peers:
   external_cro:
-    display_name: Contract Research Organisation Agent
+    # Must match the `name` on the agent card the peer actually serves.
+    # The allow-list names an agent, not an address.
+    display_name: Northwind CRO Study Agent
     owner: partner-governance@helixtx.example
     organisation: Northwind Clinical Research (partner)
     allow_listed: true
@@ -58,7 +60,7 @@ peers:
     accepts_classifications: [internal]
 
   unknown_vendor:
-    display_name: Unknown Vendor Agent
+    display_name: Vendor Assistant
     owner: unknown
     organisation: unregistered
     allow_listed: false

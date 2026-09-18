@@ -1,0 +1,171 @@
+"""Telemetry.
+
+Agent Framework already emits OpenTelemetry spans that follow the GenAI
+semantic conventions - `invoke_agent`, `chat`, `execute_tool` - so this module
+does not reinvent any of that. It does three things on top:
+
+1. Turns the providers on, from environment variables, via
+   `agent_framework.observability.configure_otel_providers()`.
+2. Adds one span of its own, `governance.policy`, carrying the four attributes
+   the session argues an enterprise actually needs on every agent action:
+   `entra.agent_id`, `governance.decision`, `governance.rule_id` and
+   `data.classification`.
+3. Propagates trace context across the A2A hop, so a delegated denial and the
+   request that caused it appear under one trace id.
+
+Note on MCP: Agent Framework injects trace context into `tools/call` requests
+for MCP sessions the agent process opens itself, which is what the local toolbox
+is. It cannot do so for a hosted Foundry toolbox, because the service issues
+that request, not us. See docs/LIVE_SETUP.md.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import os
+from collections.abc import Iterator
+
+from opentelemetry import propagate, trace
+from opentelemetry.trace import Span, SpanKind, format_span_id, format_trace_id
+
+# Attribute names. Named once so the console, the audit store and the spans
+# cannot drift apart.
+ATTR_AGENT_ID = "entra.agent_id"
+ATTR_AGENT = "helix.agent"
+ATTR_DECISION = "governance.decision"
+ATTR_RULE_ID = "governance.rule_id"
+ATTR_CLASSIFICATION = "data.classification"
+ATTR_REASON = "governance.reason"
+ATTR_ENGINE = "governance.engine"
+ATTR_MODE = "governance.mode"
+ATTR_TARGET = "governance.target"
+ATTR_KIND = "governance.target_kind"
+ATTR_DELEGATION_DEPTH = "governance.delegation_depth"
+ATTR_DELEGATION_CHAIN = "governance.delegation_chain"
+ATTR_PEER = "governance.peer"
+
+_TRACER_NAME = "helix.governance"
+_configured = False
+
+
+def instrumentation_enabled() -> bool:
+    return os.getenv("ENABLE_INSTRUMENTATION", "true").strip().lower() not in (
+        "false", "0", "no", "off",
+    )
+
+
+def configure(service_name: str | None = None) -> bool:
+    """Turn telemetry on. Returns whether it is active.
+
+    Safe to call repeatedly; the OpenTelemetry providers are process-wide and
+    must only be installed once.
+    """
+    global _configured
+    if _configured:
+        return True
+    if not instrumentation_enabled():
+        return False
+
+    from agent_framework.observability import configure_otel_providers
+
+    kwargs = {}
+    if service_name:
+        kwargs["service_name"] = service_name
+    configure_otel_providers(**kwargs)
+    _configured = True
+    return True
+
+
+def tracer():
+    return trace.get_tracer(_TRACER_NAME)
+
+
+def current_trace_id() -> str | None:
+    context = trace.get_current_span().get_span_context()
+    if not context.is_valid:
+        return None
+    return format_trace_id(context.trace_id)
+
+
+def span_ids(span: Span | None = None) -> tuple[str | None, str | None]:
+    context = (span or trace.get_current_span()).get_span_context()
+    if not context.is_valid:
+        return None, None
+    return format_trace_id(context.trace_id), format_span_id(context.span_id)
+
+
+@contextlib.contextmanager
+def root_span(name: str) -> Iterator[Span]:
+    """A span to hang a whole scenario from, so an act has one trace id."""
+    with tracer().start_as_current_span(name, kind=SpanKind.CLIENT) as span:
+        yield span
+
+
+@contextlib.contextmanager
+def policy_span(
+    *,
+    agent: str,
+    entra_agent_id: str | None,
+    target: str,
+    kind: str,
+    classification: str | None,
+    engine: str,
+    mode: str,
+    delegation_depth: int = 0,
+    delegation_chain: tuple[str, ...] = (),
+) -> Iterator[Span]:
+    """The governance decision span.
+
+    Opened before the policy is evaluated and closed after the decision is
+    known, so a denial is a span with a decision on it rather than an absence.
+    """
+    attributes = {
+        ATTR_AGENT: agent,
+        ATTR_TARGET: target,
+        ATTR_KIND: kind,
+        ATTR_ENGINE: engine,
+        ATTR_MODE: mode,
+        ATTR_DELEGATION_DEPTH: delegation_depth,
+    }
+    if entra_agent_id:
+        attributes[ATTR_AGENT_ID] = entra_agent_id
+    if classification:
+        attributes[ATTR_CLASSIFICATION] = classification
+    if delegation_chain:
+        attributes[ATTR_DELEGATION_CHAIN] = " -> ".join(delegation_chain)
+
+    with tracer().start_as_current_span(
+        f"governance.policy {target}", kind=SpanKind.INTERNAL, attributes=attributes
+    ) as span:
+        yield span
+
+
+def record_decision(span: Span, decision: str, rule_id: str, reason: str) -> None:
+    span.set_attribute(ATTR_DECISION, decision)
+    span.set_attribute(ATTR_RULE_ID, rule_id)
+    span.set_attribute(ATTR_REASON, reason)
+    # A denial is a normal, correct outcome of a working control, so it is not
+    # a span error. It is findable by attribute, which is what an auditor wants.
+    span.add_event(
+        "governance.decision",
+        {ATTR_DECISION: decision, ATTR_RULE_ID: rule_id, ATTR_REASON: reason},
+    )
+
+
+def inject_context(carrier: dict[str, str] | None = None) -> dict[str, str]:
+    """W3C trace context for the outbound A2A hop."""
+    carrier = carrier if carrier is not None else {}
+    propagate.inject(carrier)
+    return carrier
+
+
+@contextlib.contextmanager
+def extracted_context(carrier: dict[str, str]) -> Iterator[None]:
+    """Continue the caller's trace on the receiving side of an A2A hop."""
+    from opentelemetry.context import attach, detach
+
+    token = attach(propagate.extract(carrier))
+    try:
+        yield
+    finally:
+        detach(token)
