@@ -1,0 +1,66 @@
+# The agent registry.
+#
+# An agent that is not in this file is not governed - and an ungoverned agent is
+# denied everything. That is the whole contract: registration is the price of
+# being allowed to do anything at all. `shadow_agent` is deliberately absent.
+
+agents:
+  trial_ops:
+    display_name: Trial Operations Assistant
+    owner: clinops-platform@helixtx.example
+    business_unit: Clinical Operations
+    purpose: Answers protocol questions and may delegate to the contract research organisation.
+    # LIVE only: the Entra agent identity object id provisioned by Foundry.
+    # Read it from the project's JSON view in the Azure portal. See docs/LIVE_SETUP.md.
+    entra_agent_id: ${TRIAL_OPS_AGENT_IDENTITY_ID}
+    data_clearance: [internal]
+    allowed_tools: [search_docs]
+    # A peer is either a registered agent above (an internal hop) or an entry
+    # under `peers:` below (an external A2A hop). Both go through the same
+    # gateway; neither is trusted merely because it is reachable.
+    allowed_peers: [external_cro, safety_triage]
+    max_delegation_depth: 2
+
+  safety_triage:
+    display_name: Safety Triage Agent
+    owner: pv-safety@helixtx.example
+    business_unit: Pharmacovigilance
+    purpose: Triages adverse event cases.
+    entra_agent_id: ${SAFETY_TRIAGE_AGENT_IDENTITY_ID}
+    data_clearance: [internal, phi]
+    allowed_tools: [search_docs, read_case, update_case]
+    allowed_peers: []
+    max_delegation_depth: 1
+
+  supply:
+    display_name: Trial Supply Agent
+    owner: supply-chain@helixtx.example
+    business_unit: Supply Chain
+    purpose: Raises purchase orders for trial supplies.
+    entra_agent_id: ${SUPPLY_AGENT_IDENTITY_ID}
+    data_clearance: [internal, financial]
+    allowed_tools: [search_docs, create_po, lookup_supplier]
+    allowed_peers: []
+    max_delegation_depth: 1
+
+# Remote agents reachable over A2A. `allow_listed: false` peers are reachable on
+# the network but must never be delegated to - the gateway is what makes that
+# true, not the network.
+peers:
+  external_cro:
+    display_name: Contract Research Organisation Agent
+    owner: partner-governance@helixtx.example
+    organisation: Northwind Clinical Research (partner)
+    allow_listed: true
+    # MOCK: a local A2A server started by the act. LIVE: the partner's endpoint.
+    url: ${EXTERNAL_CRO_A2A_URL}
+    # Classifications this peer is permitted to receive.
+    accepts_classifications: [internal]
+
+  unknown_vendor:
+    display_name: Unknown Vendor Agent
+    owner: unknown
+    organisation: unregistered
+    allow_listed: false
+    url: ${UNKNOWN_VENDOR_A2A_URL}
+    accepts_classifications: []

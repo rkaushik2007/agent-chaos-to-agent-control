@@ -1,0 +1,322 @@
+[
+  {
+    "doc_id": "HTX-101",
+    "study": "HTX-204",
+    "section": "Inclusion criteria",
+    "title": "Inclusion criteria - clause 1",
+    "text": "Participants must be aged 18-75 at the time of screening.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-102",
+    "study": "HTX-204",
+    "section": "Inclusion criteria",
+    "title": "Inclusion criteria - clause 2",
+    "text": "Documented diagnosis confirmed by central laboratory review.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-103",
+    "study": "HTX-204",
+    "section": "Exclusion criteria",
+    "title": "Exclusion criteria - clause 3",
+    "text": "Prior exposure to an investigational agent within 90 days.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-104",
+    "study": "HTX-204",
+    "section": "Exclusion criteria",
+    "title": "Exclusion criteria - clause 4",
+    "text": "Clinically significant renal impairment at screening.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-105",
+    "study": "HTX-204",
+    "section": "Dosing",
+    "title": "Dosing - clause 5",
+    "text": "Study drug is administered once daily in the morning with food.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-106",
+    "study": "HTX-204",
+    "section": "Dosing",
+    "title": "Dosing - clause 6",
+    "text": "Dose reduction to the next lower level is permitted once per participant.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-107",
+    "study": "HTX-204",
+    "section": "Dosing",
+    "title": "Dosing - clause 7",
+    "text": "Missed doses are not made up; the next scheduled dose is taken as planned.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-108",
+    "study": "HTX-204",
+    "section": "Visit schedule",
+    "title": "Visit schedule - clause 8",
+    "text": "Screening occurs within 28 days prior to first administration.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-109",
+    "study": "HTX-204",
+    "section": "Visit schedule",
+    "title": "Visit schedule - clause 9",
+    "text": "Safety follow-up occurs 30 days after the final administration.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-110",
+    "study": "HTX-204",
+    "section": "Visit schedule",
+    "title": "Visit schedule - clause 10",
+    "text": "Unscheduled visits are permitted and recorded as such.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-111",
+    "study": "HTX-204",
+    "section": "Safety reporting",
+    "title": "Safety reporting - clause 11",
+    "text": "Serious adverse events are reported within 24 hours of awareness.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-112",
+    "study": "HTX-204",
+    "section": "Safety reporting",
+    "title": "Safety reporting - clause 12",
+    "text": "Severity is graded using the protocol-specified grading scale.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-113",
+    "study": "HTX-204",
+    "section": "Safety reporting",
+    "title": "Safety reporting - clause 13",
+    "text": "Causality is assessed independently by the site investigator.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-114",
+    "study": "HTX-204",
+    "section": "Laboratory",
+    "title": "Laboratory - clause 14",
+    "text": "Central laboratory processes all haematology and chemistry samples.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-115",
+    "study": "HTX-204",
+    "section": "Laboratory",
+    "title": "Laboratory - clause 15",
+    "text": "Repeat testing is permitted for values flagged as implausible.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-116",
+    "study": "HTX-204",
+    "section": "Randomisation",
+    "title": "Randomisation - clause 16",
+    "text": "Participants are randomised 2:1 to active or comparator.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-117",
+    "study": "HTX-204",
+    "section": "Randomisation",
+    "title": "Randomisation - clause 17",
+    "text": "Stratification is by region and by baseline severity band.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-118",
+    "study": "HTX-204",
+    "section": "Blinding",
+    "title": "Blinding - clause 18",
+    "text": "The study is double-blind; unblinding requires medical monitor approval.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-119",
+    "study": "HTX-204",
+    "section": "Blinding",
+    "title": "Blinding - clause 19",
+    "text": "Emergency unblinding is available to sites at any hour.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-120",
+    "study": "HTX-204",
+    "section": "Endpoints",
+    "title": "Endpoints - clause 20",
+    "text": "The primary endpoint is assessed at week 24.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-121",
+    "study": "HTX-204",
+    "section": "Endpoints",
+    "title": "Endpoints - clause 21",
+    "text": "Key secondary endpoints are tested in a fixed hierarchical order.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-122",
+    "study": "HTX-204",
+    "section": "Statistics",
+    "title": "Statistics - clause 22",
+    "text": "The primary analysis uses the intent-to-treat population.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-123",
+    "study": "HTX-204",
+    "section": "Statistics",
+    "title": "Statistics - clause 23",
+    "text": "Missing data are handled by multiple imputation.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-124",
+    "study": "HTX-204",
+    "section": "Supply",
+    "title": "Supply - clause 24",
+    "text": "Investigational product is shipped to sites in temperature-controlled units.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-125",
+    "study": "HTX-204",
+    "section": "Supply",
+    "title": "Supply - clause 25",
+    "text": "Sites confirm receipt and temperature excursion status within 48 hours.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-126",
+    "study": "HTX-204",
+    "section": "Supply",
+    "title": "Supply - clause 26",
+    "text": "Resupply is triggered automatically below a two-participant threshold.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-127",
+    "study": "HTX-204",
+    "section": "Monitoring",
+    "title": "Monitoring - clause 27",
+    "text": "Risk-based monitoring visits occur at least every 12 weeks.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-128",
+    "study": "HTX-204",
+    "section": "Monitoring",
+    "title": "Monitoring - clause 28",
+    "text": "Source data verification targets protocol-critical variables.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-129",
+    "study": "HTX-204",
+    "section": "Consent",
+    "title": "Consent - clause 29",
+    "text": "Re-consent is required after any substantial protocol amendment.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-130",
+    "study": "HTX-204",
+    "section": "Consent",
+    "title": "Consent - clause 30",
+    "text": "Consent documents are retained in the site investigator file.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-131",
+    "study": "HTX-204",
+    "section": "Data management",
+    "title": "Data management - clause 31",
+    "text": "Queries are issued within five working days of data entry.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-132",
+    "study": "HTX-204",
+    "section": "Data management",
+    "title": "Data management - clause 32",
+    "text": "Database lock follows resolution of all protocol-critical queries.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-133",
+    "study": "HTX-204",
+    "section": "Withdrawal",
+    "title": "Withdrawal - clause 33",
+    "text": "Participants may withdraw at any time without giving a reason.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-134",
+    "study": "HTX-204",
+    "section": "Withdrawal",
+    "title": "Withdrawal - clause 34",
+    "text": "Withdrawal from treatment does not require withdrawal from follow-up.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-135",
+    "study": "HTX-204",
+    "section": "Pharmacovigilance",
+    "title": "Pharmacovigilance - clause 35",
+    "text": "The safety database is reconciled with the clinical database monthly.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-136",
+    "study": "HTX-204",
+    "section": "Pharmacovigilance",
+    "title": "Pharmacovigilance - clause 36",
+    "text": "Expedited reports follow the applicable regional timelines.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-137",
+    "study": "HTX-204",
+    "section": "Protocol deviations",
+    "title": "Protocol deviations - clause 37",
+    "text": "Deviations are categorised as major or minor at the time of entry.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-138",
+    "study": "HTX-204",
+    "section": "Protocol deviations",
+    "title": "Protocol deviations - clause 38",
+    "text": "Major deviations are reviewed by the medical monitor.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-139",
+    "study": "HTX-204",
+    "section": "Training",
+    "title": "Training - clause 39",
+    "text": "Site staff complete protocol training before enrolling any participant.",
+    "classification": "internal"
+  },
+  {
+    "doc_id": "HTX-140",
+    "study": "HTX-204",
+    "section": "Training",
+    "title": "Training - clause 40",
+    "text": "Training records are retained for the duration of the study.",
+    "classification": "internal"
+  }
+]

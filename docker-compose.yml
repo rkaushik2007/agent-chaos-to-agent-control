@@ -1,0 +1,33 @@
+# Trace UI only. Nothing else in this demo needs Docker.
+#
+#   docker compose up -d                  Aspire Dashboard  -> http://localhost:18888
+#   docker compose --profile jaeger up -d  Jaeger (fallback) -> http://localhost:16686
+#
+# Both listen for OTLP/gRPC on localhost:4317, so OTEL_EXPORTER_OTLP_ENDPOINT
+# does not change between them.
+
+services:
+  aspire:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    container_name: agent-control-aspire
+    restart: unless-stopped
+    environment:
+      # Unsecured so the dashboard opens straight to the traces on stage instead
+      # of demanding a login token from the container logs. Local demo only -
+      # never run the dashboard unsecured anywhere that is reachable.
+      DASHBOARD__FRONTEND__AUTHMODE: Unsecured
+      DASHBOARD__OTLP__AUTHMODE: Unsecured
+    ports:
+      - "18888:18888"   # web UI
+      - "4317:18889"    # OTLP/gRPC ingest
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    container_name: agent-control-jaeger
+    restart: unless-stopped
+    profiles: ["jaeger"]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # web UI
+      - "4317:4317"     # OTLP/gRPC ingest

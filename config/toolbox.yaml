@@ -1,0 +1,45 @@
+# Tool catalogue for the `clinical-tools` MCP server.
+#
+# This file is the governance-side source of truth: it records, for every tool,
+# the action class (read | write) and the data classification the tool touches.
+# `governance/policy.py` evaluates rules against these values, so a tool cannot
+# be governed until it is catalogued here. Adding a tool to the MCP server
+# without adding it here leaves it unclassified, and unclassified means denied.
+
+server:
+  name: clinical-tools
+  description: Clinical trial operations tools for Helix Therapeutics.
+
+tools:
+  search_docs:
+    action: read
+    classification: internal
+    description: Search protocol documents for a phrase.
+  read_case:
+    action: read
+    classification: phi
+    description: Read a single adverse event case record.
+  update_case:
+    action: write
+    classification: phi
+    description: Update one field on an adverse event case record.
+  create_po:
+    action: write
+    classification: financial
+    description: Raise a purchase order for trial supplies.
+  lookup_supplier:
+    action: read
+    classification: financial
+    description: Look up an approved supplier by id or category.
+
+# Toolbox versions. `default_version` is what agents connecting to the toolbox
+# endpoint actually receive - exactly like a Foundry toolbox, where the consumer
+# endpoint always serves `default_version` and promoting a version needs no agent
+# restart. Act 2 promotes v2 live.
+versions:
+  v1:
+    tools: [search_docs, read_case, update_case, create_po]
+  v2:
+    tools: [search_docs, read_case, update_case, create_po, lookup_supplier]
+
+default_version: v1

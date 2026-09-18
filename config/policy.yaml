@@ -1,0 +1,61 @@
+# The policy. Deny by default.
+#
+# Evaluation order, first match wins:
+#   1. Registry      - unknown agent            -> DENY  (REGISTRY-000)
+#   2. Clearance     - classification not held  -> DENY  (CLEARANCE-000)
+#   3. Rules below   - first match wins
+#   4. No match      -> DENY  (DEFAULT-DENY)
+#
+# Steps 1 and 2 are structural: they come from config/agents.yaml and
+# config/toolbox.yaml, not from the rules here. They are why `trial_ops` cannot
+# touch a PHI case even if somebody writes a careless allow rule below.
+
+default_effect: deny
+
+rules:
+  - id: R-100
+    description: Every registered agent may search internal protocol documents.
+    agents: [trial_ops, safety_triage, supply]
+    tools: [search_docs]
+    actions: [read]
+    when:
+      classification_in: [internal]
+    effect: allow
+
+  - id: R-200
+    description: Pharmacovigilance may read adverse event case records.
+    agents: [safety_triage]
+    tools: [read_case]
+    actions: [read]
+    when:
+      classification_in: [phi]
+    effect: allow
+
+  - id: R-201
+    description: >-
+      Pharmacovigilance may amend a case record, but a human signs it off.
+      Writing to PHI is never unattended.
+    agents: [safety_triage]
+    tools: [update_case]
+    actions: [write]
+    when:
+      classification_in: [phi]
+    effect: approve
+
+  - id: R-300
+    description: Supply Chain may look up approved suppliers.
+    agents: [supply]
+    tools: [lookup_supplier]
+    actions: [read]
+    when:
+      classification_in: [financial]
+    effect: allow
+
+  - id: R-301
+    description: Supply Chain may raise purchase orders for trial supplies.
+    agents: [supply]
+    tools: [create_po]
+    actions: [write]
+    when:
+      classification_in: [financial]
+    effect: allow

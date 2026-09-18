@@ -1,0 +1,74 @@
+[project]
+name = "agent-chaos-to-control"
+version = "0.1.0"
+description = "Agent Chaos to Agent Control - an enterprise agent governance layer demo on Microsoft Foundry"
+requires-python = ">=3.12,<3.13"
+readme = "README.md"
+
+# Base set == MOCK mode. Fully offline: no Azure, no LLM, no network.
+dependencies = [
+    "agent-framework-core==1.19.0",
+    "agent-framework-a2a==1.0.0b260918",
+    "a2a-sdk[http-server]==1.1.4",
+    "mcp==1.30.0",
+    "opentelemetry-sdk==1.44.0",
+    "opentelemetry-exporter-otlp-proto-grpc==1.44.0",
+    "fastapi==0.141.1",
+    "uvicorn==0.53.0",
+    "sse-starlette==3.4.11",
+    "jinja2==3.1.6",
+    "httpx==0.28.1",
+    "rich==15.0.0",
+    "pydantic==2.13.5",
+    "pyyaml==6.0.3",
+    "python-dotenv==1.2.3",
+]
+
+[project.optional-dependencies]
+# LIVE mode only. Foundry model deployment, Foundry Toolbox, Entra, Azure Monitor.
+# azure-ai-projects is pinned to 2.6.1 because agent-framework-foundry 1.13.1
+# requires <2.7.0 while the Toolbox quickstart requires >=2.3.0.
+live = [
+    "agent-framework-foundry==1.13.1",
+    "agent-framework-foundry-hosting==1.0.0b260918",
+    # agent-framework-foundry-hosting needs azure-ai-agentserver-responses>=2.2.0b1,
+    # which is pre-release only. Named here so uv treats it as an explicit
+    # pre-release rather than resolving against stable versions and failing.
+    "azure-ai-agentserver-responses==2.2.0b1",
+    "azure-identity==1.25.3",
+    "azure-ai-projects==2.6.1",
+    "azure-monitor-opentelemetry==1.8.10",
+]
+# Optional enforcement engine: GOVERNANCE_ENGINE=hooks
+# agent-hooks-sdk is experimental (0.1.0a5). The default engine is `middleware`.
+hooks = [
+    "agent-hooks-sdk==0.1.0a5",
+]
+
+[project.scripts]
+demo = "scripts.demo_cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agents", "governance", "console", "mcp_servers", "remote_agents", "scripts", "infra"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.uv]
+# Several Agent Framework integration packages (a2a, foundry-hosting) and their
+# azure-ai-agentserver-* dependencies only publish pre-releases today. Allow
+# pre-releases when a pin explicitly asks for one or when resolution requires it,
+# but never silently prefer a pre-release for a package that has a stable release.
+prerelease = "if-necessary-or-explicit"

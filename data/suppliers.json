@@ -1,0 +1,122 @@
+[
+  {
+    "supplier_id": "SUP-200",
+    "name": "Vendor A Clinical Services",
+    "category": "cold chain logistics",
+    "region": "NA",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-201",
+    "name": "Vendor B Clinical Services",
+    "category": "comparator sourcing",
+    "region": "APAC",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-202",
+    "name": "Vendor C Clinical Services",
+    "category": "central laboratory",
+    "region": "NA",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-203",
+    "name": "Vendor D Clinical Services",
+    "category": "packaging and labelling",
+    "region": "EMEA",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-204",
+    "name": "Vendor E Clinical Services",
+    "category": "ancillary supplies",
+    "region": "NA",
+    "approved": false,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-205",
+    "name": "Vendor F Clinical Services",
+    "category": "courier services",
+    "region": "NA",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-206",
+    "name": "Vendor G Clinical Services",
+    "category": "cold chain logistics",
+    "region": "APAC",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-207",
+    "name": "Vendor H Clinical Services",
+    "category": "comparator sourcing",
+    "region": "EMEA",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-208",
+    "name": "Vendor I Clinical Services",
+    "category": "central laboratory",
+    "region": "EMEA",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-209",
+    "name": "Vendor J Clinical Services",
+    "category": "packaging and labelling",
+    "region": "NA",
+    "approved": false,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-210",
+    "name": "Vendor K Clinical Services",
+    "category": "ancillary supplies",
+    "region": "NA",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-211",
+    "name": "Vendor L Clinical Services",
+    "category": "courier services",
+    "region": "EMEA",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-212",
+    "name": "Vendor M Clinical Services",
+    "category": "cold chain logistics",
+    "region": "NA",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-213",
+    "name": "Vendor N Clinical Services",
+    "category": "comparator sourcing",
+    "region": "NA",
+    "approved": true,
+    "classification": "financial"
+  },
+  {
+    "supplier_id": "SUP-214",
+    "name": "Vendor O Clinical Services",
+    "category": "central laboratory",
+    "region": "NA",
+    "approved": false,
+    "classification": "financial"
+  }
+]
