@@ -1,0 +1,196 @@
+/* Projector-first.
+ *
+ * Light theme only, 20px body, 32px+ headings, and decision colours chosen to
+ * survive a washed-out projector: deep green, deep red and a dark amber on
+ * white, each also carrying a word and a shape so the meaning does not rest on
+ * hue alone.
+ */
+
+:root {
+  --ink: #14181f;
+  --ink-soft: #3d4654;
+  --rule: #c9d1dc;
+  --panel: #ffffff;
+  --page: #eef2f7;
+
+  --allow: #0b6b2f;
+  --allow-bg: #d8f0e0;
+  --deny: #a11020;
+  --deny-bg: #fadadd;
+  --approve: #8a5200;
+  --approve-bg: #fdeccd;
+  --shadow-flag: #a11020;
+  --shadow-flag-bg: #fadadd;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 20px; }
+
+body {
+  margin: 0;
+  padding: 0 24px 40px;
+  background: var(--page);
+  color: var(--ink);
+  font-family: "Segoe UI", Inter, -apple-system, system-ui, Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+header.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 16px 28px;
+  padding: 24px 4px 16px;
+  border-bottom: 3px solid var(--ink);
+  margin-bottom: 24px;
+}
+
+h1 {
+  font-size: 2.1rem;   /* 42px */
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 1.6rem;   /* 32px */
+  margin: 0 0 14px;
+}
+
+.badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 5px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+}
+.badge.mock { background: #dbe7ff; }
+.badge.live { background: #ffe3b8; }
+
+.tally { margin-left: auto; display: flex; gap: 20px; font-weight: 700; }
+.tally .allow { color: var(--allow); }
+.tally .deny { color: var(--deny); }
+.tally .approve { color: var(--approve); }
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } }
+
+section.panel {
+  background: var(--panel);
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  padding: 20px 22px 24px;
+}
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
+tbody tr:last-child td { border-bottom: none; }
+
+.mono { font-family: "Cascadia Mono", Consolas, "SF Mono", monospace; font-size: 0.85rem; }
+.muted { color: var(--ink-soft); }
+.tool { display: inline-block; margin: 0 6px 4px 0; padding: 2px 9px; border: 1px solid var(--rule); border-radius: 5px; font-size: 0.8rem; }
+
+/* Decisions -------------------------------------------------------------- */
+
+.outcome {
+  display: inline-block;
+  min-width: 118px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.82rem;
+  letter-spacing: 0.07em;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 2px solid currentColor;
+}
+.outcome.allow, .outcome.approved { color: var(--allow); background: var(--allow-bg); }
+.outcome.deny, .outcome.rejected, .outcome.timeout, .outcome.blocked { color: var(--deny); background: var(--deny-bg); }
+.outcome.approve { color: var(--approve); background: var(--approve-bg); }
+
+tr.row-deny, tr.row-rejected, tr.row-timeout { background: #fff5f6; }
+tr.row-approve { background: #fffaf0; }
+
+/* Unregistered agents ----------------------------------------------------- */
+
+tr.unregistered { background: var(--shadow-flag-bg); }
+tr.unregistered td { color: var(--shadow-flag); font-weight: 700; }
+.flag {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 2px solid var(--shadow-flag);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+/* Approvals --------------------------------------------------------------- */
+
+.approval {
+  border: 3px solid var(--approve);
+  background: var(--approve-bg);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+.approval h3 { font-size: 1.25rem; margin: 0 0 8px; }
+.approval .args { margin: 10px 0 16px; }
+.approval form { display: inline; }
+
+button {
+  font: inherit;
+  font-weight: 800;
+  font-size: 1rem;
+  padding: 12px 26px;
+  margin-right: 12px;
+  border-radius: 8px;
+  border: 3px solid var(--ink);
+  cursor: pointer;
+}
+button.approve { background: var(--allow-bg); color: var(--allow); border-color: var(--allow); }
+button.reject { background: var(--deny-bg); color: var(--deny); border-color: var(--deny); }
+button:hover { filter: brightness(0.95); }
+button:focus-visible { outline: 4px solid #1a63d8; outline-offset: 3px; }
+
+.empty { color: var(--ink-soft); font-style: italic; padding: 10px 0; }
+
+a { color: #0b4fa8; font-weight: 700; }
+a:focus-visible { outline: 3px solid #1a63d8; outline-offset: 2px; }
+
+footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--rule); color: var(--ink-soft); font-size: 0.85rem; }
+
+/* Column widths for the decision feed.
+ *
+ * Without these the reason column collapses and a one-line explanation becomes
+ * a fifteen-line ribbon - which is exactly the column an audience reads.
+ */
+#decisions table { table-layout: fixed; }
+#decisions th:nth-child(1), #decisions td:nth-child(1) { width: 7%; }
+#decisions th:nth-child(2), #decisions td:nth-child(2) { width: 17%; }
+#decisions th:nth-child(3), #decisions td:nth-child(3) { width: 15%; }
+#decisions th:nth-child(4), #decisions td:nth-child(4) { width: 13%; }
+#decisions th:nth-child(5), #decisions td:nth-child(5) { width: 38%; }
+#decisions th:nth-child(6), #decisions td:nth-child(6) { width: 10%; }
+/* Only the reason may break mid-word. Agent ids and tool names broken across
+ * lines are unreadable at the back of a room. */
+#decisions td:nth-child(5) { overflow-wrap: anywhere; }
+#decisions td:nth-child(2) strong,
+#decisions td:nth-child(3),
+#decisions td:nth-child(6) a { white-space: nowrap; }
+#decisions td:nth-child(2) .mono { font-size: 0.72rem; }
+
+#inventory table { table-layout: fixed; }
+#inventory th:nth-child(1), #inventory td:nth-child(1) { width: 18%; }
+#inventory th:nth-child(2), #inventory td:nth-child(2) { width: 26%; }
+#inventory th:nth-child(3), #inventory td:nth-child(3) { width: 18%; }
+#inventory th:nth-child(4), #inventory td:nth-child(4) { width: 14%; }
+#inventory td { overflow-wrap: anywhere; }

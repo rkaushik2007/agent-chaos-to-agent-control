@@ -1,0 +1,23 @@
+{% if approvals %}
+  {% for a in approvals %}
+  <div class="approval">
+    <h3>{{ a.agent }} wants to call {{ a.target }}</h3>
+    <p>{{ a.reason }} <span class="mono">({{ a.rule_id }})</span></p>
+    <div class="args mono">
+      {% for key, value in a.arguments.items() %}{{ key }}={{ value }}{% if not loop.last %} &middot; {% endif %}{% endfor %}
+    </div>
+    <p class="muted">
+      Classification: <strong>{{ a.classification or 'unclassified' }}</strong>.
+      No answer within {{ a.timeout_seconds | int }}s is a denial.
+    </p>
+    <form hx-post="/approvals/{{ a.id }}/approve" hx-target="#approvals" hx-swap="innerHTML">
+      <button class="approve" type="submit">Approve</button>
+    </form>
+    <form hx-post="/approvals/{{ a.id }}/reject" hx-target="#approvals" hx-swap="innerHTML">
+      <button class="reject" type="submit">Reject</button>
+    </form>
+  </div>
+  {% endfor %}
+{% else %}
+  <p class="empty">Nothing is waiting for a human.</p>
+{% endif %}

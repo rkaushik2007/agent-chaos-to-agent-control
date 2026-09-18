@@ -37,6 +37,7 @@ from mcp_servers.clinical_tools import server as tools_server
 from mcp_servers.clinical_tools.runtime import clinical_tools_server
 from remote_agents.external_cro.server import CRO, UNKNOWN_VENDOR, remote_agent
 from scripts import narrate
+from console.serve import console_server
 from scripts.acts.result import ActResult
 
 TOOL_SCENARIOS = (
@@ -55,6 +56,9 @@ A2A_SCENARIOS = (
 
 # The shadow agent asserts its own identity. Nothing issued this; it is exactly
 # what an unapproved agent would present, and the registry is what refuses it.
+# Filled in by the scene that talks to the partner agents, read by the summary.
+_RECEIVED: dict[str, list[str]] = {"external_cro": [], "unknown_vendor": []}
+
 SELF_ASSERTED_SHADOW = Principal(
     agent_id="shadow_agent",
     identity_label="self-asserted",
@@ -95,13 +99,26 @@ async def run(*, interactive: bool = True) -> ActResult:
                    "and lands in the same audit store.")
     print()
 
-    console_url = await _maybe_start_console()
     queue = approval_queue()
     queue.auto_resolver = None if interactive else auto_approve
     if not interactive:
         narrate.warn("Non-interactive run: approvals are auto-approved by the harness.")
         print()
 
+    # The console runs in this process so that one approval queue and one audit
+    # store serve both, and there is nothing to start in the right order on stage.
+    async with console_server() as console_url:
+        narrate.step(f"Governance console: [bold]{console_url}[/bold]")
+        narrate.detail("Leave it open. The approval below is answered there.")
+        print()
+        await _scenes(result, reg, identity, engine, interactive, console_url, queue)
+
+    telemetry.flush()
+    _summary(result, _RECEIVED)
+    return result
+
+
+async def _scenes(result, reg, identity, engine, interactive, console_url, queue):
     async with clinical_tools_server() as tools_url:
         async with remote_agent(CRO) as (cro_url, cro_executor):
             async with remote_agent(UNKNOWN_VENDOR) as (vendor_url, vendor_executor):
@@ -121,9 +138,9 @@ async def run(*, interactive: bool = True) -> ActResult:
                     "unknown_vendor": list(vendor_executor.received),
                 }
 
+    _RECEIVED.clear()
+    _RECEIVED.update(received)
     _partner_table(received)
-    _summary(result, received)
-    return result
 
 
 async def _tool_calls(result, identity, tools, engine, interactive, console_url, queue):
@@ -219,11 +236,6 @@ def queue_timeout() -> float:
     from governance import settings
 
     return settings.approval_timeout_seconds()
-
-
-async def _maybe_start_console() -> str | None:
-    """The console is act 5's deliverable; act 3 uses it if it is there."""
-    return None
 
 
 def _partner_table(received: dict[str, list[str]]) -> None:

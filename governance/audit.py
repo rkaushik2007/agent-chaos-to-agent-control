@@ -69,7 +69,9 @@ class AuditEntry:
 
     @property
     def short_trace(self) -> str:
-        return (self.trace_id or "")[:16]
+        # Eight hex characters is enough to recognise one trace among a handful
+        # on screen, and short enough not to wrap in a table column.
+        return (self.trace_id or "")[:8]
 
 
 class AuditStore:

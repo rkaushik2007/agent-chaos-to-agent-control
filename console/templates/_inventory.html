@@ -1,0 +1,28 @@
+<table>
+  <thead>
+    <tr>
+      <th>Agent</th><th>Business unit / owner</th><th>Identity</th><th>Clearance</th><th>Tools</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in inventory %}
+    <tr class="{{ 'unregistered' if not row.registered else '' }}">
+      <td>
+        <strong>{{ row.id }}</strong><br>
+        {% if row.registered %}
+          <span class="muted">{{ row.display_name }}</span>
+        {% else %}
+          <span class="flag">NOT IN REGISTRY</span>
+        {% endif %}
+      </td>
+      <td>{{ row.business_unit }}<br><span class="muted mono">{{ row.owner }}</span></td>
+      <td class="mono">{{ row.identity }}</td>
+      <td>{{ row.clearance | join(', ') if row.clearance else 'none' }}</td>
+      <td>
+        {% for tool in row.tools %}<span class="tool">{{ tool }}</span>{% else %}none{% endfor %}
+        {% if row.peers %}<br><span class="muted">peers: {{ row.peers | join(', ') }}</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>

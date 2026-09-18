@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Helix Agent Governance Console</title>
+  <link rel="stylesheet" href="/static/console.css">
+  <!-- Vendored, not from a CDN: MOCK has to work with the network unplugged. -->
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+
+<header class="masthead">
+  <h1>Helix Agent Governance</h1>
+  <span class="badge {{ mode }}">{{ mode }} mode</span>
+  <span class="badge">engine: {{ engine }}</span>
+  <div class="tally">
+    <span class="allow">allow {{ counts.get('allow', 0) + counts.get('approved', 0) }}</span>
+    <span class="approve">awaiting {{ counts.get('approve', 0) }}</span>
+    <span class="deny">deny {{ counts.get('deny', 0) + counts.get('rejected', 0) + counts.get('timeout', 0) }}</span>
+    <span class="muted">total {{ total }}</span>
+  </div>
+</header>
+
+<div class="grid">
+
+  <section class="panel">
+    <h2>Approval queue</h2>
+    <div id="approvals"
+         hx-get="/panels/approvals"
+         hx-trigger="load, every 2s"
+         hx-swap="innerHTML">
+      {% include "_approvals.html" %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Live decisions</h2>
+    <div id="decisions"
+         hx-get="/panels/decisions"
+         hx-trigger="load, every 2s, governance-decision from:body"
+         hx-swap="innerHTML">
+      {% include "_decisions.html" %}
+    </div>
+  </section>
+
+  <section class="panel" style="grid-column: 1 / -1;">
+    <h2>Agent inventory</h2>
+    <div id="inventory"
+         hx-get="/panels/inventory"
+         hx-trigger="load, every 5s, governance-decision from:body"
+         hx-swap="innerHTML">
+      {% include "_inventory.html" %}
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  Traces: <a href="{{ trace_ui }}" target="_blank" rel="noopener">{{ trace_ui }}</a>
+  &middot; an unanswered approval is denied after {{ approval_timeout }}s
+  &middot; every decision on this page is also a row in the audit store
+</footer>
+
+<script>
+  // The panels poll, which is enough on its own. This stream turns a decision
+  // into an immediate refresh so the feed moves while somebody is talking over
+  // it, rather than up to two seconds later.
+  (function () {
+    const source = new EventSource("/events");
+    const nudge = () => document.body.dispatchEvent(new Event("governance-decision"));
+    source.addEventListener("decision", nudge);
+    source.addEventListener("approval.requested", nudge);
+    source.addEventListener("approval.resolved", nudge);
+    source.onerror = () => { /* polling already covers this; nothing to do. */ };
+  })();
+</script>
+
+</body>
+</html>

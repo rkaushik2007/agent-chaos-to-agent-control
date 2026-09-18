@@ -54,11 +54,27 @@ def instrumentation_enabled() -> bool:
     )
 
 
-def configure(service_name: str | None = None) -> bool:
-    """Turn telemetry on. Returns whether it is active.
+DEFAULT_OTLP_ENDPOINT = "http://localhost:4317"
 
-    Safe to call repeatedly; the OpenTelemetry providers are process-wide and
-    must only be installed once.
+_EXPORTER_VARS = (
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "ENABLE_CONSOLE_EXPORTERS",
+)
+
+
+def configure(service_name: str | None = None) -> bool:
+    """Turn telemetry on. Returns whether spans are actually being recorded.
+
+    `configure_otel_providers()` installs providers only if at least one
+    exporter is configured. With none, it quietly does nothing and every span is
+    a `NonRecordingSpan` with no trace id - which would cost act 4 the one thing
+    it exists to show, and would do it silently, on stage, because somebody
+    forgot to copy `.env`.
+
+    So if nothing is configured we point at the default OTLP endpoint anyway.
+    Spans then record and carry real trace ids whether or not a collector is
+    listening; an unreachable collector costs a background retry, not the act.
     """
     global _configured
     if _configured:
@@ -68,12 +84,22 @@ def configure(service_name: str | None = None) -> bool:
 
     from agent_framework.observability import configure_otel_providers
 
-    kwargs = {}
+    if not any(os.getenv(var) for var in _EXPORTER_VARS):
+        os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = DEFAULT_OTLP_ENDPOINT
+
+    kwargs: dict[str, object] = {"otlp_timeout": 2}
     if service_name:
         kwargs["service_name"] = service_name
     configure_otel_providers(**kwargs)
-    _configured = True
-    return True
+
+    _configured = recording()
+    return _configured
+
+
+def recording() -> bool:
+    """Is a real tracer provider installed, i.e. do spans have trace ids?"""
+    provider = trace.get_tracer_provider()
+    return type(provider).__name__ != "ProxyTracerProvider"
 
 
 def tracer():
@@ -169,3 +195,36 @@ def extracted_context(carrier: dict[str, str]) -> Iterator[None]:
         yield
     finally:
         detach(token)
+
+
+def flush(timeout_millis: int = 5000) -> bool:
+    """Push everything buffered to the collector, now.
+
+    The batch span processor exports on a timer, so a short act can finish and
+    the process exit before its spans leave. On stage that means clicking the
+    trace id the act just printed and finding nothing there. Acts call this
+    before they print their closing summary.
+    """
+    flushed = False
+    for getter in (trace.get_tracer_provider, _meter_provider, _logger_provider):
+        provider = getter()
+        force_flush = getattr(provider, "force_flush", None)
+        if callable(force_flush):
+            try:
+                force_flush(timeout_millis)
+                flushed = True
+            except Exception:  # pragma: no cover - exporter/collector specific
+                continue
+    return flushed
+
+
+def _meter_provider():
+    from opentelemetry import metrics
+
+    return metrics.get_meter_provider()
+
+
+def _logger_provider():
+    from opentelemetry import _logs
+
+    return _logs.get_logger_provider()

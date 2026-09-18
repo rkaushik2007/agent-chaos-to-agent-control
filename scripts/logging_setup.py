@@ -29,6 +29,14 @@ NOISY = (
     "azure.core.pipeline.policies.http_logging_policy",
     "azure.identity",
     "opentelemetry",
+    "opentelemetry.sdk",
+    "opentelemetry.exporter",
+    "opentelemetry.exporter.otlp",
+    "opentelemetry.exporter.otlp.proto.grpc",
+    "opentelemetry.exporter.otlp.proto.grpc.exporter",
+    "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
+    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
+    "opentelemetry.exporter.otlp.proto.grpc.metric_exporter",
     "a2a",
 )
 
@@ -50,3 +58,43 @@ def quiet(verbose: bool | None = None) -> None:
     # is not informative.
     warnings.filterwarnings("ignore", category=UserWarning, module="agent_framework.*")
     warnings.filterwarnings("ignore", message=".*[Ee]xperimental.*")
+
+    # A collector that is not running must cost a retry, not a wall of red on
+    # the projector. The spans still record and still carry trace ids.
+    for name in (
+        "opentelemetry.exporter.otlp.proto.grpc.exporter",
+        "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
+        "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
+        "opentelemetry.exporter.otlp.proto.grpc.metric_exporter",
+    ):
+        logging.getLogger(name).setLevel(logging.CRITICAL)
+
+
+def quiet_asyncio(verbose: bool | None = None) -> None:
+    """Stop benign socket teardown from printing a traceback mid-act.
+
+    Windows' proactor loop reports `ConnectionResetError` when the far end of an
+    already-finished HTTP connection goes away. It is noise, it is unavoidable
+    with several short-lived loopback servers per act, and a traceback on a
+    projector reads as a failure.
+    """
+    import asyncio
+
+    if verbose is None:
+        verbose = os.getenv("DEMO_VERBOSE", "").strip().lower() in ("1", "true", "yes", "on")
+    if verbose:
+        return
+
+    loop = asyncio.get_running_loop()
+    default = loop.get_exception_handler()
+
+    def handler(loop_, context) -> None:
+        exception = context.get("exception")
+        if isinstance(exception, (ConnectionResetError, ConnectionAbortedError)):
+            return
+        if default is not None:
+            default(loop_, context)
+        else:
+            loop_.default_exception_handler(context)
+
+    loop.set_exception_handler(handler)

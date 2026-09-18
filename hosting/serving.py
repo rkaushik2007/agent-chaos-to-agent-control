@@ -37,8 +37,12 @@ START_TIMEOUT = 15.0
 SHUTDOWN_TIMEOUT = 10.0
 
 
-def bind_loopback() -> socket.socket:
-    """A bound, listening loopback socket on a port the OS chose.
+def bind_loopback(port: int = 0) -> socket.socket:
+    """A bound, listening loopback socket.
+
+    `port` 0 - the default - lets the OS choose. A specific port is used for
+    the console, which needs a URL the runbook can print in advance; if it is
+    taken, the OS picks another rather than failing the act.
 
     `SO_REUSEADDR` is deliberately NOT set. On Windows it does not mean what it
     means on Linux: it lets a second socket bind an address another socket is
@@ -47,14 +51,19 @@ def bind_loopback() -> socket.socket:
     leaving the option off makes the OS hand out a port nothing else holds.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(("127.0.0.1", 0))
+    try:
+        sock.bind(("127.0.0.1", port))
+    except OSError:
+        if not port:
+            raise
+        sock.bind(("127.0.0.1", 0))
     sock.listen(128)
     sock.setblocking(False)
     return sock
 
 
 @contextlib.asynccontextmanager
-async def serve_asgi(app=None, *, app_factory=None) -> AsyncIterator[str]:
+async def serve_asgi(app=None, *, app_factory=None, port: int = 0) -> AsyncIterator[str]:
     """Serve an ASGI app on loopback in a background thread, yielding its base URL.
 
     Pass `app_factory` instead of `app` for a service that must embed its own
@@ -66,7 +75,7 @@ async def serve_asgi(app=None, *, app_factory=None) -> AsyncIterator[str]:
     if (app is None) == (app_factory is None):
         raise TypeError("serve_asgi takes exactly one of `app` or `app_factory`")
 
-    sock = bind_loopback()
+    sock = bind_loopback(port)
     host, port = sock.getsockname()[:2]
     if app_factory is not None:
         app = app_factory(f"http://{host}:{port}")
@@ -76,6 +85,10 @@ async def serve_asgi(app=None, *, app_factory=None) -> AsyncIterator[str]:
             app,
             log_level="error",
             access_log=False,
+            # Leave this process's logging alone. uvicorn's default
+            # config calls dictConfig and undoes the silencing the acts
+            # applied, putting transport chatter back on the projector.
+            log_config=None,
             # Without a bound here uvicorn waits indefinitely for idle keep-alive
             # connections to close, and an MCP client that has been closed but
             # whose pooled socket lingers adds seconds to every act and every

@@ -1,0 +1,30 @@
+{% if decisions %}
+<table>
+  <thead>
+    <tr><th>Time</th><th>Agent</th><th>Target</th><th>Decision</th><th>Rule / reason</th><th>Trace</th></tr>
+  </thead>
+  <tbody>
+  {% for d in decisions %}
+    <tr class="row-{{ d.outcome }}">
+      <td class="mono">{{ d.at }}</td>
+      <td><strong>{{ d.agent }}</strong><br><span class="muted mono">{{ d.identity }}</span></td>
+      <td>
+        {{ d.target }}
+        <br><span class="muted">{{ d.kind }}{% if d.classification %} &middot; {{ d.classification }}{% endif %}</span>
+      </td>
+      <td><span class="outcome {{ d.outcome }}">{{ d.outcome }}</span></td>
+      <td><span class="mono">{{ d.rule_id }}</span><br><span class="muted">{{ d.reason }}</span></td>
+      <td>
+        {% if d.trace_id %}
+          <a href="/trace/{{ d.trace_id }}" target="_blank" rel="noopener" class="mono">{{ d.short_trace }}</a>
+        {% else %}
+          <span class="muted">-</span>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No decisions yet. Run an act.</p>
+{% endif %}

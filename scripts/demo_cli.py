@@ -22,13 +22,18 @@ from collections.abc import Awaitable, Callable
 
 from governance import settings
 from scripts import narrate
-from scripts.logging_setup import quiet
+from scripts.logging_setup import quiet, quiet_asyncio
 
 
 def _run_act(number: int) -> Callable[[argparse.Namespace], int]:
     def runner(args: argparse.Namespace) -> int:
         module = __import__(f"scripts.acts.act{number}", fromlist=["run"])
-        result = asyncio.run(module.run(interactive=not args.non_interactive))
+
+        async def go():
+            quiet_asyncio()
+            return await module.run(interactive=not args.non_interactive)
+
+        result = asyncio.run(go())
         return 0 if result is not None else 1
 
     return runner
