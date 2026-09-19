@@ -12,20 +12,55 @@ from __future__ import annotations
 
 import time
 
-from agent_framework import MCPStreamableHTTPTool
+import httpx
 
 from agents.planner import ToolCall, scenario
 from agents.toolresult import as_text
 from governance.identity import IdentityError, MockIdentityProvider, identity_provider
 from governance.registry import registry
 from governance.settings import demo_mode
-from governance.toolbox import local_toolbox
+from governance.toolbox import tool_source_factory
 from mcp_servers.clinical_tools.runtime import clinical_tools_server
 from scripts import narrate
 from scripts.acts.result import ActResult
 
 GOVERNED = ("trial_ops", "safety_triage", "supply")
 UNGOVERNED = "shadow_agent"
+
+
+def bare(tool: str) -> str:
+    """Foundry namespaces tools as `<server_label>___<tool>`.
+
+    Governance strips that before evaluating policy; the narration strips it too,
+    because the audience is being shown which *tool* each agent can see, not
+    which source it happens to arrive from.
+    """
+    from governance.toolbox_live import strip_namespace
+
+    return strip_namespace(tool)
+
+
+async def _anonymous_tools(endpoint: str) -> list[str]:
+    """What a caller with no identity gets. A plain request, no MCP client.
+
+    Deliberately not an `MCPStreamableHTTPTool`: when the handshake is rejected -
+    which is the whole point here - its lifecycle task is left pending and
+    asyncio complains loudly over the narration.
+    """
+    request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+    headers = {
+        "Accept": "application/json, text/event-stream",
+        "Content-Type": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(endpoint, json=request, headers=headers)
+        if response.status_code >= 400:
+            return []
+        payload = response.json()
+    except Exception:
+        return []
+    return sorted(t["name"] for t in payload.get("result", {}).get("tools", []))
 
 
 async def run(*, interactive: bool = True) -> ActResult:
@@ -85,7 +120,8 @@ async def run(*, interactive: bool = True) -> ActResult:
     print()
 
     async with clinical_tools_server() as upstream:
-        async with local_toolbox(upstream, identity, reg) as toolbox:
+        # LocalToolbox in MOCK, the Foundry toolbox endpoint in LIVE.
+        async with tool_source_factory()(upstream, identity, reg) as toolbox:
             # ------------------------------------------------------- toolbox
             narrate.step(f"One endpoint: [bold]{toolbox.endpoint}[/bold]")
             narrate.detail(
@@ -103,7 +139,7 @@ async def run(*, interactive: bool = True) -> ActResult:
             )
             for agent_id in GOVERNED:
                 async with toolbox.session_for(principals[agent_id]) as session:
-                    names = sorted(f.name for f in session.functions)
+                    names = sorted(bare(f.name) for f in session.functions)
                 listing.add_row(
                     f"[bold]{agent_id}[/bold]",
                     f"[green]{principals[agent_id].identity_label}[/green]",
@@ -111,9 +147,11 @@ async def run(*, interactive: bool = True) -> ActResult:
                 )
                 result.record(agent_id, "tools/list", "filtered", reason=",".join(names))
 
-            # The shadow agent has no identity, so this is all it can do.
-            async with MCPStreamableHTTPTool(name="anonymous", url=toolbox.endpoint) as anon:
-                anon_names = sorted(f.name for f in anon.functions)
+            # The shadow agent has no identity, so this is all it can do. The
+            # local toolbox answers with an empty list; Foundry rejects the
+            # request outright. Both are "you get nothing", and neither should
+            # take the act down.
+            anon_names = await _anonymous_tools(toolbox.endpoint)
             listing.add_row(
                 f"[bold red]{UNGOVERNED}[/bold red]",
                 "[red]none[/red]",
@@ -128,7 +166,7 @@ async def run(*, interactive: bool = True) -> ActResult:
             sc = scenario("toolbox.supply_lookup")
             narrate.step(f"Supply Chain is asked: [white]{sc.prompt}[/white]")
             async with toolbox.session_for(principals["supply"]) as session:
-                before = sorted(f.name for f in session.functions)
+                before = sorted(bare(f.name) for f in session.functions)
             narrate.detail(f"supply sees {before} - there is no supplier lookup at "
                            f"{toolbox.version}.")
             print()
@@ -148,11 +186,11 @@ async def run(*, interactive: bool = True) -> ActResult:
 
             narrate.step("The same agent asks again")
             async with toolbox.session_for(principals["supply"]) as session:
-                after = sorted(f.name for f in session.functions)
+                after = sorted(bare(f.name) for f in session.functions)
                 narrate.detail(f"supply now sees {after}")
                 for stp in sc.steps:
                     assert isinstance(stp, ToolCall)
-                    fn = next((f for f in session.functions if f.name == stp.tool), None)
+                    fn = next((f for f in session.functions if bare(f.name) == stp.tool), None)
                     assert fn is not None, f"{stp.tool} did not appear after promotion"
                     narrate.detail(f"calls [bold]{stp.render()}[/bold]")
                     output = as_text(await fn.invoke(arguments=stp.arguments), limit=100)
@@ -165,7 +203,7 @@ async def run(*, interactive: bool = True) -> ActResult:
 
             # trial_ops is unaffected by the promotion - it was never granted it.
             async with toolbox.session_for(principals["trial_ops"]) as session:
-                trial_after = sorted(f.name for f in session.functions)
+                trial_after = sorted(bare(f.name) for f in session.functions)
             narrate.detail(
                 f"trial_ops still sees {trial_after} - a new tool in the toolbox is "
                 "not a new grant."

@@ -78,6 +78,35 @@ uv run demo act4
 
 ---
 
+## Present the acts in MOCK
+
+Not because LIVE is unreliable - it was verified working end to end - but because
+**in LIVE the model chooses the tools, and it does not always choose what the
+script expected.** Observed during verification: `safety_triage` called
+`update_case`, then `read_case`, then `update_case` again; `shadow_agent` asked
+for `lookup_supplier` instead of `create_po`; and in one act 4 run the model
+never attempted the PHI write, so the escalation the act builds towards never
+happened.
+
+Every one of those was governed correctly, which is the strongest thing the talk
+can say - the policy never consulted the planner. But an act whose closing beat
+depends on a specific tool call should not be left to a model in front of an
+audience.
+
+Use LIVE to show the same layer with a real model, real Entra tokens and a real
+Foundry toolbox. Use MOCK to land the beats.
+
+```bash
+DEMO_MODE=live uv run demo act2    # real toolbox, real promotion
+DEMO_MODE=live uv run demo act3    # real model, policy still holding
+```
+
+See [LIVE_SETUP.md](LIVE_SETUP.md) - including the two preview behaviours that
+will otherwise cost you an hour: Foundry namespaces tool names, and it caches
+tool discovery per server label.
+
+---
+
 ## Between rehearsals
 
 ```bash

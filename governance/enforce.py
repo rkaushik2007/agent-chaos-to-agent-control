@@ -211,6 +211,13 @@ async def guard_tool(
     engine: str | None = None,
 ) -> GuardResult:
     """Evaluate and enforce one tool call."""
+    # A Foundry toolbox namespaces the tools it re-publishes
+    # (`clinical_tools___search_docs`). Policy is written against the tool, not
+    # the route to it, so the namespace is stripped before evaluation - and the
+    # audit row records the bare name too, so MOCK and LIVE rows are comparable.
+    from governance.toolbox_live import strip_namespace
+
+    tool = strip_namespace(tool)
     reg = registry()
     request = policy_input_for(reg, principal.agent_id, tool)
     decision = policy().evaluate(request)

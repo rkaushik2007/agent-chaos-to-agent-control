@@ -38,7 +38,7 @@ from governance.context import acting_as
 from governance.enforce import GuardResult
 from governance.identity import MockIdentityProvider, identity_provider
 from governance.registry import registry
-from governance.toolbox import local_toolbox
+from governance.toolbox import tool_source_factory
 from mcp_servers.clinical_tools import server as tools_server
 from mcp_servers.clinical_tools.runtime import clinical_tools_server
 from scripts import narrate
@@ -59,6 +59,7 @@ async def run(*, interactive: bool = True) -> ActResult:
     os.environ["APPROVAL_TIMEOUT_SECONDS"] = os.getenv("ACT4_APPROVAL_TIMEOUT", DEFAULT_TIMEOUT)
     exporting = telemetry.configure(service_name=os.getenv("OTEL_SERVICE_NAME",
                                                            "helix-agent-governance"))
+    await _configure_azure_monitor()
 
     identity = (
         identity_provider(reg) if settings.demo_mode() == "live"
@@ -107,7 +108,10 @@ async def _one_request(result: ActResult, reg, identity, queue) -> str | None:
     trial_ops = identity.issue("trial_ops")
 
     async with clinical_tools_server() as upstream:
-        async with local_toolbox(upstream, identity, reg, version="v2") as toolbox:
+        # LocalToolbox in MOCK, the Foundry toolbox endpoint in LIVE.
+        async with tool_source_factory()(
+            upstream, identity, reg, version="v2"
+        ) as toolbox:
             narrate.step(f"Tools reached through the toolbox at [bold]{toolbox.endpoint}[/bold] "
                          f"({toolbox.version})")
 
@@ -232,3 +236,23 @@ def _open(console_url: str) -> None:
             webbrowser.open_new_tab(url)
         except Exception:  # pragma: no cover - platform dependent
             narrate.warn(f"could not open a browser for {url}; open it yourself")
+
+
+async def _configure_azure_monitor() -> None:
+    """LIVE only: also export to the Foundry project's Application Insights.
+
+    Never fatal. A project without Application Insights attached still gets the
+    local collector, and an act that refuses to start because a second telemetry
+    sink is missing would be a worse trade than one trace UI short.
+    """
+    from governance.settings import demo_mode
+
+    if demo_mode() != "live":
+        return
+    from governance.model_live import configure_azure_monitor_from_project
+
+    if await configure_azure_monitor_from_project():
+        narrate.detail("Also exporting to the Foundry project's Application Insights.")
+    else:
+        narrate.warn("No Application Insights configured on the project; "
+                     "traces go to the local collector only.")

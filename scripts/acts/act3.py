@@ -78,6 +78,7 @@ async def run(*, interactive: bool = True) -> ActResult:
     # Default on, but never override somebody who turned it off on purpose.
     os.environ.setdefault("ENABLE_INSTRUMENTATION", "true")
     telemetry.configure(service_name="helix-agent-governance")
+    await _configure_azure_monitor()
 
     identity = (
         identity_provider(reg) if demo_mode() == "live" else MockIdentityProvider(reg)
@@ -274,3 +275,23 @@ def _summary(result: ActResult, received: dict[str, list[str]]) -> None:
 
 def _scenario_needs_human(sc) -> bool:
     return sc.key == "enforce.safety_triage_updates_case"
+
+
+async def _configure_azure_monitor() -> None:
+    """LIVE only: also export to the Foundry project's Application Insights.
+
+    Never fatal. A project without Application Insights attached still gets the
+    local collector, and an act that refuses to start because a second telemetry
+    sink is missing would be a worse trade than one trace UI short.
+    """
+    from governance.settings import demo_mode
+
+    if demo_mode() != "live":
+        return
+    from governance.model_live import configure_azure_monitor_from_project
+
+    if await configure_azure_monitor_from_project():
+        narrate.detail("Also exporting to the Foundry project's Application Insights.")
+    else:
+        narrate.warn("No Application Insights configured on the project; "
+                     "traces go to the local collector only.")

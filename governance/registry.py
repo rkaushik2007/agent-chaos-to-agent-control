@@ -73,6 +73,8 @@ class Registry:
     peers: dict[str, PeerRecord]
     tools: dict[str, ToolRecord]
     toolbox_versions: dict[str, tuple[str, ...]]
+    # catalogue version name -> the version id Foundry assigned (LIVE only)
+    live_versions: dict[str, str]
     default_version: str
     server_name: str = "clinical-tools"
     _source: tuple[Path, ...] = field(default=(), compare=False)
@@ -103,6 +105,14 @@ class Registry:
     def action_of(self, tool_name: str) -> str | None:
         record = self.tools.get(tool_name)
         return record.action if record else None
+
+    def live_version_of(self, version: str) -> str:
+        """The Foundry version id for a catalogue version name.
+
+        Falls back to the name itself so a deployment that numbers its versions
+        the same way needs no mapping at all.
+        """
+        return self.live_versions.get(version, version)
 
     def tools_in_version(self, version: str) -> tuple[str, ...]:
         try:
@@ -207,9 +217,15 @@ def load_registry(
         for name, spec in (toolbox_doc.get("tools") or {}).items()
     }
 
+    version_specs = toolbox_doc.get("versions") or {}
     versions = {
         version: tuple(spec.get("tools") or ())
-        for version, spec in (toolbox_doc.get("versions") or {}).items()
+        for version, spec in version_specs.items()
+    }
+    live_versions = {
+        version: str(spec["live_version"])
+        for version, spec in version_specs.items()
+        if spec.get("live_version")
     }
     default_version = toolbox_doc.get("default_version") or next(iter(versions), "v1")
 
@@ -225,6 +241,7 @@ def load_registry(
         peers=peers,
         tools=tools,
         toolbox_versions=versions,
+        live_versions=live_versions,
         default_version=default_version,
         server_name=(toolbox_doc.get("server") or {}).get("name", "clinical-tools"),
         _source=(agents_file, toolbox_file),

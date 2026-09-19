@@ -36,10 +36,16 @@ tools:
 # endpoint actually receive - exactly like a Foundry toolbox, where the consumer
 # endpoint always serves `default_version` and promoting a version needs no agent
 # restart. Act 2 promotes v2 live.
+# `live_version` is the numeric version id Foundry assigned when this catalogue
+# version was published with `infra/create_toolbox.py`. MOCK ignores it; LIVE
+# needs it because a Foundry toolbox version is "1", "2", ... and this file's
+# names are "v1", "v2". The create script prints the value to paste in.
 versions:
   v1:
     tools: [search_docs, read_case, update_case, create_po]
+    live_version: "1"
   v2:
     tools: [search_docs, read_case, update_case, create_po, lookup_supplier]
+    live_version: "2"
 
 default_version: v1

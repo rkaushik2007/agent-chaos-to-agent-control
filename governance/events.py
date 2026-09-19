@@ -61,6 +61,8 @@ class EventBus:
         try:
             while True:
                 yield await queue.get()
+        except (asyncio.CancelledError, GeneratorExit):
+            return
         finally:
             with self._lock:
                 if entry in self._subscribers:

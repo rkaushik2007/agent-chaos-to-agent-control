@@ -13,6 +13,7 @@ fixtures are never modified.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -108,9 +109,29 @@ def lookup_supplier(query: str) -> str:
 
 
 TOOLS = (search_docs, read_case, update_case, create_po, lookup_supplier)
+TOOLS_BY_NAME = {fn.__name__: fn for fn in TOOLS}
 
 
-def build_server() -> FastMCP:
+def tools_for_version(version: str | None) -> tuple:
+    """The tool functions a catalogue version publishes.
+
+    A Foundry toolbox version contains tool *sources*, not individual tools -
+    Foundry discovers the tools from the MCP server itself. So publishing four
+    tools in v1 and five in v2 means the server behind v1 really does expose
+    four. `CLINICAL_TOOLS_VERSION` selects which.
+    """
+    if not version:
+        return TOOLS
+    import yaml
+
+    from governance.settings import TOOLBOX_FILE
+
+    catalogue = yaml.safe_load(TOOLBOX_FILE.read_text(encoding="utf-8"))
+    names = catalogue["versions"][version]["tools"]
+    return tuple(TOOLS_BY_NAME[name] for name in names)
+
+
+def build_server(version: str | None = None) -> FastMCP:
     """Build a fresh server instance.
 
     A `FastMCP` caches its streamable-HTTP session manager, and a session
@@ -125,11 +146,25 @@ def build_server() -> FastMCP:
     # eventually leaves a server that accepts connections but never answers.
     # Nothing here needs session state, and MCP `_meta` trace propagation is
     # per-request, so statelessness costs the demo nothing.
-    server = FastMCP(name=SERVER_NAME, stateless_http=True)
-    for fn in TOOLS:
+    # Host and port matter only when the server is run standalone - which is
+    # what LIVE needs, because a Foundry toolbox is a managed service and cannot
+    # reach loopback on a laptop. See docs/LIVE_SETUP.md.
+    version = version or os.getenv("CLINICAL_TOOLS_VERSION") or None
+    server = FastMCP(
+        name=SERVER_NAME,
+        stateless_http=True,
+        host=os.getenv("CLINICAL_TOOLS_HOST", "127.0.0.1"),
+        port=int(os.getenv("CLINICAL_TOOLS_PORT", "8765")),
+    )
+    for fn in tools_for_version(version):
         server.tool()(fn)
     return server
 
 
 if __name__ == "__main__":
-    build_server().run(transport="streamable-http")
+    server = build_server()
+    print(
+        f"clinical-tools on http://{server.settings.host}:{server.settings.port}"
+        f"{server.settings.streamable_http_path}"
+    )
+    server.run(transport="streamable-http")

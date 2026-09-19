@@ -187,13 +187,22 @@ async def events(request: Request) -> EventSourceResponse:
     """
 
     async def stream():
-        async for event in bus().subscribe():
-            if await request.is_disconnected():
-                break
-            yield {
-                "event": event.kind,
-                "data": json.dumps({"at": event.at, **event.payload}, default=str),
-            }
+        # An open SSE stream is the normal state on stage: the presenter leaves
+        # the console up while the act finishes. When the act's server then
+        # shuts down, this task is cancelled mid-yield, and without catching it
+        # uvicorn prints "Exception in ASGI application" and a traceback over
+        # the closing summary. A cancelled stream is a browser tab closing, not
+        # a fault.
+        try:
+            async for event in bus().subscribe():
+                if await request.is_disconnected():
+                    break
+                yield {
+                    "event": event.kind,
+                    "data": json.dumps({"at": event.at, **event.payload}, default=str),
+                }
+        except (asyncio.CancelledError, GeneratorExit):
+            return
 
     return EventSourceResponse(stream())
 
