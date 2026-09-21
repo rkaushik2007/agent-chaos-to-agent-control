@@ -60,6 +60,16 @@ def install_quiet_exception_handler(loop: asyncio.AbstractEventLoop | None = Non
     loop.set_exception_handler(handler)
 
 
+def _something_is_listening(port: int, timeout: float = 0.25) -> bool:
+    for host in ("127.0.0.1", "localhost"):
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def bind_loopback(port: int = 0) -> socket.socket:
     """A bound, listening loopback socket.
 
@@ -73,6 +83,14 @@ def bind_loopback(port: int = 0) -> socket.socket:
     server here asks for port 0, so we never need to re-bind a fixed port, and
     leaving the option off makes the OS hand out a port nothing else holds.
     """
+    # Asking the OS whether the bind succeeds is not enough on Windows: a bind to
+    # 127.0.0.1:port can succeed while another process holds 0.0.0.0:port, and
+    # then connections to localhost go to whichever socket the OS feels like.
+    # Connecting first is the only reliable "is anyone already there?" check, and
+    # on loopback a refused connect is immediate.
+    if port and _something_is_listening(port):
+        port = 0
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         sock.bind(("127.0.0.1", port))

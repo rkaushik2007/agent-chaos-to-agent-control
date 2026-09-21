@@ -119,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
 
     c = sub.add_parser("console", help="serve the governance console")
     c.add_argument("--host", default="127.0.0.1")
-    c.add_argument("--port", type=int, default=8000)
+    c.add_argument("--port", type=int, default=settings.console_port())
     c.set_defaults(func=_cmd_console)
 
     args = parser.parse_args(argv)

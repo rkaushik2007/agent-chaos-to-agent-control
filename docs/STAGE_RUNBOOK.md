@@ -18,7 +18,7 @@ decision the talk depends on; a green rehearsal is the only claim worth making a
 Then open and leave open:
 
 - <http://localhost:18888> — the trace UI (Aspire Dashboard)
-- <http://localhost:8000> — the governance console (acts 3 and 4 start it themselves)
+- <http://localhost:8787> — the governance console (acts 3 and 4 start it themselves)
 
 ---
 
@@ -121,12 +121,12 @@ If a port is stuck (an act was killed mid-run):
 
 ```bash
 # Windows
-netstat -ano | findstr :8000
+netstat -ano | findstr :8787
 taskkill /PID <pid> /F
 ```
 
-The tool servers and partner agents use ephemeral ports and clean themselves up; only the console's 8000
-is fixed, and it falls back to another port rather than failing the act.
+The tool servers and partner agents use ephemeral ports and clean themselves up; only the console's port
+is fixed, and it falls back to another rather than failing the act - saying so when it does.
 
 ---
 
@@ -162,7 +162,8 @@ The console is served by the act itself, so it only works **while the act is run
 after the timeout the act has already denied, which is the correct behaviour and a fine thing to say out
 loud. To retry: Ctrl-C and re-run `uv run demo act3`.
 
-If port 8000 was taken, the act printed a different URL — use the one in the terminal.
+If the port was taken, the act warned you and printed a different URL — use the one in the terminal.
+`uv run demo doctor` checks this before you start, and `CONSOLE_PORT` overrides it.
 
 ### An act hangs
 

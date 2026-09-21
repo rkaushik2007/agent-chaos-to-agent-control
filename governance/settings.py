@@ -59,6 +59,21 @@ def trace_ui_base_url() -> str:
     return os.getenv("TRACE_UI_URL", "http://localhost:18888").rstrip("/")
 
 
+# Not 8000. That is the default for half the dev servers ever written, so it is
+# the port most likely to be held by something else on the machine you present
+# from - which is exactly when you cannot afford to go hunting. 8787 is
+# uncommon, and easy to read out loud.
+DEFAULT_CONSOLE_PORT = 8787
+
+
+def console_port() -> int:
+    """The port the governance console prefers. `CONSOLE_PORT` overrides it."""
+    try:
+        return int(os.getenv("CONSOLE_PORT", "") or DEFAULT_CONSOLE_PORT)
+    except ValueError:
+        return DEFAULT_CONSOLE_PORT
+
+
 def approval_timeout_seconds() -> float:
     return float(os.getenv("APPROVAL_TIMEOUT_SECONDS", "60"))
 

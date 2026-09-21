@@ -77,6 +77,16 @@ def doctor() -> int:
     table.add_row("audit store", OK,
                   f"{db} ({'exists' if Path(db).exists() else 'will be created'})")
 
+    console = settings.console_port()
+    if _port_open("127.0.0.1", console):
+        table.add_row(
+            "console port", WARN,
+            f"{console} is already in use - the console will fall back to another "
+            "port and say so. Set CONSOLE_PORT to pick one.",
+        )
+    else:
+        table.add_row("console port", OK, f"{console} is free")
+
     otlp = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
     host_port = otlp.split("//", 1)[-1]
     host, _, port = host_port.partition(":")

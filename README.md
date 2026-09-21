@@ -56,7 +56,7 @@ Win32 console calls that vanish the moment output is redirected. `DEMO_FORCE_COL
 `DEMO_CONSOLE_WIDTH=140` are the manual overrides for any other host.
 
 Act 3 waits for you to click **Approve** in the browser, so run it with the console open at
-<http://localhost:8000>.
+<http://localhost:8787>.
 
 ---
 
