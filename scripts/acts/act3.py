@@ -110,7 +110,10 @@ async def run(*, interactive: bool = True) -> ActResult:
     # store serve both, and there is nothing to start in the right order on stage.
     async with console_server() as console_url:
         narrate.step(f"Governance console: [bold]{console_url}[/bold]")
-        narrate.detail("Leave it open. The approval below is answered there.")
+        if interactive:
+            narrate.detail("Leave it open. The approval below is answered there.")
+        else:
+            narrate.detail("Nothing to click - this run auto-approves.")
         print()
         await _scenes(result, reg, identity, engine, interactive, console_url, queue)
 
@@ -203,11 +206,12 @@ async def _delegations(result, identity, gateway):
         narrate.detail(f"[bold]{sc.agent}[/bold] -> {step.render()}")
         with acting_as(principal):
             delegation = await gateway.delegate(
-                principal, step.peer, step.task, classification=step.classification
+                principal, step.peer, step.task,
+                classification=step.classification,
+                on_decision=lambda d: _show(result, d),
             )
-        _show(result, delegation.result)
         if delegation.reply:
-            narrate.detail(f"   partner replied: {delegation.reply[:96]}")
+            narrate.detail(f"   partner replied: {narrate.clip(delegation.reply, 120)}")
     print()
 
 
@@ -216,7 +220,7 @@ def _show(result: ActResult, decision: GuardResult) -> None:
         decision.principal_id,
         decision.target,
         decision.display_outcome,
-        decision.reason[:70],
+        narrate.clip(decision.reason, 96),
         decision.rule_id,
     )
     result.record(

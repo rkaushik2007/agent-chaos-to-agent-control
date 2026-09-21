@@ -244,7 +244,15 @@ class A2AGateway:
         task: str,
         *,
         classification: str = "internal",
+        on_decision: Callable[[GuardResult], None] | None = None,
     ) -> Delegation:
+        """Evaluate and, if permitted, perform one outbound hop.
+
+        `on_decision` fires the moment the gateway has decided and before the
+        peer is invoked. Without it a caller can only report the hop after the
+        callee has returned, which puts the delegated work on screen *above* the
+        decision that allowed it - backwards for anyone reading along.
+        """
         depth = delegation_depth()
         chain = delegation_chain()
         card = await self.fetch_card(peer_id)
@@ -262,6 +270,8 @@ class A2AGateway:
             classification=classification,
             arguments={"task": task, "peer_url": self.endpoint_for(peer_id)},
         )
+        if on_decision is not None:
+            on_decision(result)
         if not result.allowed:
             return Delegation(result=result)
 

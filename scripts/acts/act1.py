@@ -10,6 +10,7 @@ The only thing this act builds is the problem.
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 from agent_framework import MCPStreamableHTTPTool
@@ -66,6 +67,7 @@ async def run(*, interactive: bool = True) -> ActResult:
 
 
 async def _chaos(result: ActResult) -> ActResult:
+    began = time.monotonic()
 
     narrate.act_title(
         1,
@@ -117,7 +119,8 @@ async def _chaos(result: ActResult) -> ActResult:
         status_after = _field(tools_server.read_case("AE-0007"), "status")
         pos = tools_server.purchase_orders()
 
-    damage = narrate.table("Damage done in the last 20 seconds",
+    # The real elapsed time, not a number baked in when the act was longer.
+    damage = narrate.table(f"Damage done in the last {time.monotonic() - began:.1f} seconds",
                            ["What changed", "Who did it", "Authorised by"])
     damage.add_row(
         f"AE-0007 status: {status_before!r} -> {status_after!r}",

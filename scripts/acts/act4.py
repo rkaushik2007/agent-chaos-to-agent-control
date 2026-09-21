@@ -151,11 +151,13 @@ async def _one_request(result: ActResult, reg, identity, queue) -> str | None:
                         f"{int(settings.approval_timeout_seconds())}s."
                     )
                     with acting_as(trial_ops):
-                        delegation = await gateway.delegate(
+                        # Reported as the gateway decides, so the hop appears
+                        # above the work it let through rather than below it.
+                        await gateway.delegate(
                             trial_ops, step.peer, step.task,
                             classification=step.classification,
+                            on_decision=lambda d: _show(result, d, indent="   "),
                         )
-                    _show(result, delegation.result, indent="   ")
 
                 span.set_attribute("helix.scenario", outer.key)
             result.trace_id = trace_id
@@ -176,7 +178,7 @@ def _show(result: ActResult, decision: GuardResult, indent: str = "") -> None:
         f"[{narrate.DECISION_STYLE.get(decision.display_outcome, 'white')}]"
         f"{decision.display_outcome.upper():<9}"
         f"[/{narrate.DECISION_STYLE.get(decision.display_outcome, 'white')}] "
-        f"[white]({decision.rule_id})[/white]  {decision.reason[:58]}"
+        f"[white]({decision.rule_id})[/white]  {narrate.clip(decision.reason, 96)}"
     )
     result.record(decision.principal_id, decision.target, decision.display_outcome,
                   decision.rule_id, decision.reason)

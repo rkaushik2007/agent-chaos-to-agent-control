@@ -52,8 +52,10 @@ EXPECTED: dict[int, list[tuple[str, str, str]]] = {
     ],
     4: [
         ("trial_ops", "search_docs", "allow"),
-        ("safety_triage", "update_case", "timeout"),
+        # The hop is reported the moment the gateway permits it, which is before
+        # the callee runs - so it reads above the work it let through.
         ("trial_ops", "safety_triage", "allow"),
+        ("safety_triage", "update_case", "timeout"),
     ],
 }
 

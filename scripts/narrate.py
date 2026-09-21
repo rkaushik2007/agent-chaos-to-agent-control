@@ -113,6 +113,19 @@ def act_title(number: int, name: str, subtitle: str) -> None:
     )
 
 
+def clip(text: str, limit: int) -> str:
+    """Shorten to `limit` without cutting a word in half.
+
+    A reason that ends "...internal protocol docume" reads as a bug to an
+    audience, whatever it actually says.
+    """
+    text = " ".join((text or "").split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0] or text[:limit]
+    return cut.rstrip(" ,;:.") + "..."
+
+
 def step(text: str) -> None:
     console.print(f"[bold white]->[/bold white] {text}")
 
