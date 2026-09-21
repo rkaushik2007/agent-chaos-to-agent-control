@@ -178,15 +178,19 @@ themselves, so box characters should be correct.
 
 ## Timings from a clean machine
 
-| Step | Time |
-|---|---|
-| `uv sync --all-extras --group dev` (cold) | ~60s |
-| `uv run demo rehearse` | ~25s |
-| `uv run demo act1` | ~8s |
-| `uv run demo act2` | ~8s |
-| `uv run demo act3` | ~20s + however long you take to click Approve |
-| `uv run demo act4` | ~15s (8s of which is the escalation expiring) |
-| `uv run pytest -q` | ~60s |
+| Step | Time | Measured |
+|---|---|---|
+| `uv sync --all-extras --group dev` (cold clone) | ~26s | yes |
+| `uv run demo rehearse` | ~14s | yes |
+| `uv run demo act1` | ~2s | yes |
+| `uv run demo act2` | ~5s | yes |
+| `uv run demo act3` | ~6s + however long you take to click Approve | yes |
+| `uv run demo act4` | ~13s (8s of which is the escalation expiring) | yes |
+| `uv run pytest -q` | ~44s | yes |
+
+Every act is comfortably inside three minutes; the constraint on stage is how
+much you say over them, not how long they take. Act 3 is the only one that waits
+for you.
 
 Act 4's escalation timeout is `ACT4_APPROVAL_TIMEOUT` (default 8 seconds). Shorten it if you are tight;
 lengthen it if you want to talk over the wait.
