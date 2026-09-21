@@ -34,6 +34,30 @@ the same tool calls every time, so every act produces the same decisions on ever
 fallback and what attendees run. `DEMO_MODE=live` swaps in a Foundry model deployment, the Foundry
 Toolbox and Entra agent identities — see [docs/LIVE_SETUP.md](docs/LIVE_SETUP.md).
 
+### Running it in PyCharm
+
+Open the folder, then:
+
+1. **Set the interpreter.** *Settings → Project → Python Interpreter → Add → Existing*, and point at
+   `.venv\Scripts\python.exe` (Python 3.12). `uv sync` has already created it — do not let PyCharm make
+   a new venv.
+2. **Pick a run configuration.** Nine are committed in `.idea/runConfigurations/`: the four acts,
+   *Rehearse*, *Doctor*, *Reset*, *Console only* and *All tests*. They already use module mode
+   (`-m scripts.demo_cli`), the repo root as working directory, and **Emulate terminal in output
+   console**.
+
+That last checkbox is the one that matters. Without it PyCharm's run console is not a TTY, and rich
+turns off colour and clamps to 79 columns — which for a demo whose point is a colour-coded
+ALLOW / DENY / APPROVE column means losing the demo. If you build your own configuration, tick it.
+
+Belt and braces: the acts also detect PyCharm (`PYCHARM_HOSTED`) and force colour on anyway. On Windows
+that needs both an ANSI colour system *and* `legacy_windows=False`, because rich otherwise paints through
+Win32 console calls that vanish the moment output is redirected. `DEMO_FORCE_COLOR=1` and
+`DEMO_CONSOLE_WIDTH=140` are the manual overrides for any other host.
+
+Act 3 waits for you to click **Approve** in the browser, so run it with the console open at
+<http://localhost:8000>.
+
 ---
 
 ## The four acts

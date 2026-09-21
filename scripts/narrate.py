@@ -8,6 +8,7 @@ dim text, no 8-bit greys.
 
 from __future__ import annotations
 
+import os
 import sys
 
 from rich.console import Console
@@ -23,7 +24,63 @@ for _stream in (sys.stdout, sys.stderr):
     except (AttributeError, OSError):  # pragma: no cover - non-reconfigurable stream
         pass
 
-console = Console(highlight=False, soft_wrap=False)
+def _build_console() -> Console:
+    """A console that still looks like the demo when stdout is not a terminal.
+
+    rich turns colour off and clamps to 79 columns whenever stdout is not a TTY,
+    which is exactly what PyCharm's run console is unless "Emulate terminal in
+    output console" is ticked. For a demo whose whole point is a colour-coded
+    ALLOW / DENY / APPROVE column, losing colour is losing the demo.
+
+    PyCharm sets `PYCHARM_HOSTED=1` in every run configuration, so that alone is
+    enough to know colour is safe. `DEMO_FORCE_COLOR` and `DEMO_CONSOLE_WIDTH`
+    are the manual overrides for any other host - CI logs, tmux, a captured
+    recording.
+    """
+    requested = (
+        os.getenv("DEMO_FORCE_COLOR")
+        or os.getenv("FORCE_COLOR")
+        or os.getenv("PYCHARM_HOSTED")
+    )
+    force_terminal = (
+        True if requested and requested.strip().lower() not in ("0", "false", "no", "off")
+        else None
+    )
+    try:
+        width = int(os.getenv("DEMO_CONSOLE_WIDTH", "")) or None
+    except ValueError:
+        width = None
+    # A forced terminal with no width of its own would fall back to 80 and wrap
+    # every table, so give it something a projector can use.
+    if force_terminal and width is None and not sys.stdout.isatty():
+        width = 120
+
+    # Two Windows-specific things have to be switched off together, or forcing a
+    # terminal changes nothing at all:
+    #
+    #   color_system   defaults to "windows", which paints with Win32 console
+    #                  calls instead of escape sequences
+    #   legacy_windows detected as True, which makes rich strip ANSI on its way
+    #                  out and use that Win32 renderer
+    #
+    # Either one left alone and the output is still completely colourless once
+    # it is redirected into a host like PyCharm's run console. Both off and the
+    # escape sequences PyCharm understands actually arrive.
+    extra: dict[str, object] = {}
+    if force_terminal:
+        extra["color_system"] = "truecolor"
+        extra["legacy_windows"] = False
+
+    return Console(
+        highlight=False,
+        soft_wrap=False,
+        force_terminal=force_terminal,
+        width=width,
+        **extra,
+    )
+
+
+console = _build_console()
 
 DECISION_STYLE = {
     "allow": "bold green",

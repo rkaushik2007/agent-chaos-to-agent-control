@@ -12,6 +12,11 @@ __pycache__/
 build/
 dist/
 
+# PyCharm. The run configurations are shared on purpose - they are how you
+# start the demo from the IDE - but nothing else in .idea is.
+.idea/*
+!.idea/runConfigurations/
+
 # Runtime artefacts
 audit.db
 *.db-journal
