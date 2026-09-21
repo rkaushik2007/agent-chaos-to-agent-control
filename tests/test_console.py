@@ -8,6 +8,7 @@ to miss, and that the Approve button actually resolves an act that is waiting.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
 import httpx
 import pytest
@@ -207,3 +208,144 @@ async def test_the_decisions_api_matches_the_audit_store(client, identity, isola
     for row in rows:
         assert row["rule_id"]
         assert row["reason"]
+
+
+# ---------------------------------------------------------------------------
+# The live feed's shutdown behaviour
+# ---------------------------------------------------------------------------
+
+async def test_events_still_reach_a_subscriber():
+    """The sentinel that ends a stream must not swallow ordinary events."""
+    from governance.events import EventBus
+
+    bus = EventBus()
+    received = []
+
+    async def listen():
+        async for event in bus.subscribe():
+            received.append(event)
+            if len(received) == 2:
+                return
+
+    task = asyncio.create_task(listen())
+    for _ in range(200):
+        if bus.subscriber_count:
+            break
+        await asyncio.sleep(0.005)
+
+    bus.publish("decision", agent="trial_ops", kind="tool", outcome="allow")
+    bus.publish("decision", agent="supply", kind="tool", outcome="deny")
+    await asyncio.wait_for(task, timeout=5)
+
+    assert [e.kind for e in received] == ["decision", "decision"]
+    assert received[0].payload["agent"] == "trial_ops"
+    # The payload legitimately carries its own `kind`; the bus must not collide
+    # with it (it used to).
+    assert received[0].payload["kind"] == "tool"
+
+
+async def test_closing_the_bus_ends_open_streams():
+    """Why this matters: an SSE stream that is still open when the act's server
+    stops gets cancelled inside sse-starlette's own task group, which re-raises
+    out of reach of any guard in the generator - and uvicorn prints a traceback
+    over the closing summary."""
+    from governance.events import EventBus
+
+    bus = EventBus()
+    ended = asyncio.Event()
+
+    async def listen():
+        async for _ in bus.subscribe():
+            pass
+        ended.set()
+
+    task = asyncio.create_task(listen())
+    for _ in range(200):
+        if bus.subscriber_count:
+            break
+        await asyncio.sleep(0.005)
+    assert bus.subscriber_count == 1
+
+    bus.close()
+    await asyncio.wait_for(ended.wait(), timeout=5)
+    await asyncio.wait_for(task, timeout=5)
+    assert bus.subscriber_count == 0
+
+
+async def test_an_open_sse_stream_does_not_produce_a_traceback_at_shutdown(caplog):
+    """The regression this guards, in full.
+
+    A browser left on the console holds an SSE stream open. When the act ends,
+    uvicorn cancels the in-flight response, sse-starlette re-raises that out of
+    its own task group - past any guard inside the generator - and uvicorn logs
+    "Exception in ASGI application" with a traceback, over the act's closing
+    summary. The console now ends its streams before the server stops.
+
+    The stream has to still be open when the server stops, which means holding
+    it in a background task: an `async with http.stream(...)` block closes it on
+    the way out, and then there is nothing in flight to cancel and this test
+    proves nothing.
+    """
+    import logging
+
+    from console.serve import console_server
+    from governance.events import bus
+
+    caplog.set_level(logging.ERROR, logger="uvicorn.error")
+    holder: asyncio.Task | None = None
+
+    async def hold(url: str) -> None:
+        async with httpx.AsyncClient(timeout=30) as http:
+            async with http.stream("GET", f"{url}/events") as response:
+                async for _ in response.aiter_lines():
+                    pass
+
+    async with console_server(port=0) as base_url:
+        holder = asyncio.create_task(hold(base_url))
+        for _ in range(400):
+            if bus().subscriber_count:
+                break
+            await asyncio.sleep(0.005)
+        assert bus().subscriber_count >= 1, "the stream never reached the bus"
+        # Exit here with the stream still open.
+
+    if holder is not None:
+        holder.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await holder
+
+    noisy = [
+        r for r in caplog.records
+        if "ASGI application" in r.getMessage() or "graceful shutdown" in r.getMessage()
+    ]
+    assert not noisy, f"shutdown logged {len(noisy)} error(s): {[r.getMessage() for r in noisy]}"
+
+
+async def test_a_decision_reaches_an_open_sse_stream(identity):
+    """End to end over a real server, not an in-process transport."""
+    from console.serve import console_server
+
+    received: list[str] = []
+
+    async with console_server(port=0) as base_url:
+        async with httpx.AsyncClient(timeout=15) as http:
+            async with http.stream("GET", f"{base_url}/events") as response:
+
+                async def publish() -> None:
+                    from governance.events import bus
+
+                    for _ in range(200):
+                        if bus().subscriber_count:
+                            break
+                        await asyncio.sleep(0.005)
+                    await seed_decisions(identity)
+
+                async def read() -> None:
+                    async for line in response.aiter_lines():
+                        if line.startswith("data:"):
+                            received.append(line)
+                            return
+
+                await asyncio.wait_for(asyncio.gather(publish(), read()), timeout=15)
+
+    assert received and "trial_ops" in received[0]

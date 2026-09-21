@@ -9,6 +9,7 @@ store, and means there is nothing to start in the right order on stage.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from collections.abc import AsyncIterator
 
@@ -33,13 +34,21 @@ async def console_server(port: int | None = None) -> AsyncIterator[str]:
 
     preferred = settings.console_port() if port is None else port
 
+    from governance.events import bus
+
     async with serve_asgi(app, port=preferred) as base_url:
         actual = int(base_url.rsplit(":", 1)[1])
-        if actual != preferred:
+        if preferred and actual != preferred:
             from scripts import narrate
 
             narrate.warn(
                 f"port {preferred} is taken by something else, so the console is "
                 f"on {actual} instead. Use the URL below, not the one in the runbook."
             )
-        yield base_url
+        try:
+            yield base_url
+        finally:
+            # Let open SSE streams end themselves before uvicorn starts
+            # cancelling in-flight responses.
+            bus().close()
+            await asyncio.sleep(0.15)

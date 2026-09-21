@@ -21,6 +21,12 @@ from typing import Any
 
 MAX_BACKLOG = 200
 
+# Pushed to every subscriber to end its generator cleanly. Without it the only
+# thing that ever stops an SSE stream is the server cancelling it mid-response,
+# and sse-starlette re-raises that cancellation out of its own task group where
+# no amount of guarding inside the generator can catch it.
+_CLOSED = object()
+
 
 @dataclass(frozen=True)
 class Event:
@@ -60,13 +66,31 @@ class EventBus:
             self._subscribers.append(entry)
         try:
             while True:
-                yield await queue.get()
+                item = await queue.get()
+                if item is _CLOSED:
+                    return
+                yield item
         except (asyncio.CancelledError, GeneratorExit):
             return
         finally:
             with self._lock:
                 if entry in self._subscribers:
                     self._subscribers.remove(entry)
+
+    def close(self) -> None:
+        """End every subscriber's stream.
+
+        Called before the console's server stops, so in-flight SSE responses
+        finish on their own terms instead of being cancelled underneath
+        sse-starlette.
+        """
+        with self._lock:
+            subscribers = list(self._subscribers)
+        for loop, queue in subscribers:
+            try:
+                loop.call_soon_threadsafe(_offer, queue, _CLOSED)
+            except RuntimeError:
+                continue
 
     @property
     def subscriber_count(self) -> int:
