@@ -41,7 +41,8 @@ Checklist:
 - [ ] Browser open on the console and the trace UI, zoomed so the back row can read them
 - [ ] Notifications, Slack, Teams and email quit
 - [ ] `DEMO_MODE` is what you intend — check the badge in the console masthead
-- [ ] If presenting LIVE: `az login` done, and `DEMO_MODE=live uv run demo doctor` is clean
+- [ ] If presenting LIVE: `az login` done, `uv run python infra/start_live_tools.py` running in its own
+      terminal (the Foundry toolbox calls tools through it), and `DEMO_MODE=live uv run demo doctor` is clean
 
 ---
 

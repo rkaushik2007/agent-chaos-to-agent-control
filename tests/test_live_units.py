@@ -182,3 +182,86 @@ def test_the_mode_switch_selects_the_live_implementations(monkeypatch):
 
     assert isinstance(identity_provider(registry()), MockIdentityProvider)
     assert tool_source_factory() is local_toolbox
+
+
+# ---------------------------------------------------------------------------
+# Telemetry: one provider, and MOCK stays offline
+# ---------------------------------------------------------------------------
+
+def test_mock_never_looks_up_application_insights(monkeypatch):
+    """MOCK is offline by promise. It must not even ask Azure."""
+    from governance import telemetry
+
+    constructed = []
+
+    class Spy:
+        def __init__(self, *args, **kwargs):
+            constructed.append(1)
+
+    monkeypatch.setenv("DEMO_MODE", "mock")
+    monkeypatch.setenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "InstrumentationKey=would-leak")
+    monkeypatch.setattr("azure.ai.projects.AIProjectClient", Spy)
+
+    assert telemetry._application_insights_connection_string() is None
+    assert constructed == []
+
+
+def test_live_prefers_an_explicit_connection_string(monkeypatch):
+    from governance import telemetry
+
+    monkeypatch.setenv("DEMO_MODE", "live")
+    monkeypatch.setenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "InstrumentationKey=explicit")
+    assert telemetry._application_insights_connection_string() == "InstrumentationKey=explicit"
+
+
+def _fake_provider(*exporter_names: str):
+    """A provider shaped like the SDK's, holding exporters with these class names."""
+    from types import SimpleNamespace
+
+    processors = tuple(
+        SimpleNamespace(span_exporter=type(name, (), {})()) for name in exporter_names
+    )
+    return SimpleNamespace(
+        _active_span_processor=SimpleNamespace(_span_processors=processors)
+    )
+
+
+def test_azure_monitor_is_not_reported_when_only_the_local_exporter_is_attached(monkeypatch):
+    """The bug this guards: "a span processor exists" was taken to mean "Azure
+    is receiving spans". The local OTLP exporter satisfied that check on its own,
+    so the act announced Azure export that was not happening."""
+    from opentelemetry import trace
+
+    from governance import telemetry
+
+    monkeypatch.setattr(trace, "get_tracer_provider", lambda: _fake_provider("OTLPSpanExporter"))
+    assert telemetry.azure_monitor_active() is False
+
+
+def test_azure_monitor_is_reported_when_its_exporter_is_attached(monkeypatch):
+    from opentelemetry import trace
+
+    from governance import telemetry
+
+    monkeypatch.setattr(
+        trace, "get_tracer_provider",
+        lambda: _fake_provider("OTLPSpanExporter", "AzureMonitorTraceExporter"),
+    )
+    assert telemetry.azure_monitor_active() is True
+
+
+def test_azure_monitor_exporters_cover_traces_logs_and_metrics():
+    from governance import telemetry
+
+    kinds = {
+        type(e).__name__
+        for e in telemetry._azure_monitor_exporters(
+            "InstrumentationKey=00000000-0000-0000-0000-000000000000;"
+            "IngestionEndpoint=https://example.invalid/"
+        )
+    }
+    assert kinds == {
+        "AzureMonitorTraceExporter",
+        "AzureMonitorLogExporter",
+        "AzureMonitorMetricExporter",
+    }

@@ -90,10 +90,82 @@ def configure(service_name: str | None = None) -> bool:
     kwargs: dict[str, object] = {"otlp_timeout": 2}
     if service_name:
         kwargs["service_name"] = service_name
+
+    # LIVE only: Azure Monitor goes in as extra exporters on the SAME provider.
+    #
+    # The obvious alternative - configure OTLP here, then call
+    # `configure_azure_monitor()` afterwards - does not work, and fails quietly.
+    # OpenTelemetry allows the global provider to be set once; the second call
+    # logs "Overriding of current TracerProvider is not allowed" and is ignored.
+    # Its HTTP auto-instrumentation still ships a few request spans to Azure, so
+    # traces *appear* in Application Insights - but every governance.policy span,
+    # and every invoke_agent / chat / execute_tool span, goes only to the local
+    # collector. Verified: 7 spans reached Application Insights, none of them the
+    # ones the talk is about.
+    connection_string = _application_insights_connection_string()
+    if connection_string:
+        kwargs["exporters"] = _azure_monitor_exporters(connection_string)
+
     configure_otel_providers(**kwargs)
 
     _configured = recording()
     return _configured
+
+
+def _application_insights_connection_string() -> str | None:
+    """The Foundry project's Application Insights, LIVE only.
+
+    MOCK never looks. It is offline by promise, not by accident, so it does not
+    reach out to Azure even when a connection string happens to be configured.
+    """
+    from governance import settings
+
+    if settings.demo_mode() != "live":
+        return None
+    explicit = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "").strip()
+    if explicit:
+        return explicit
+    endpoint = os.getenv("FOUNDRY_PROJECT_ENDPOINT", "").strip()
+    if not endpoint:
+        return None
+    try:
+        from azure.ai.projects import AIProjectClient
+        from azure.identity import AzureCliCredential
+
+        with AIProjectClient(endpoint=endpoint, credential=AzureCliCredential()) as client:
+            return client.telemetry.get_application_insights_connection_string() or None
+    except Exception:  # noqa: BLE001 - no App Insights is the common case
+        return None
+
+
+def _azure_monitor_exporters(connection_string: str) -> list:
+    from azure.monitor.opentelemetry.exporter import (
+        AzureMonitorLogExporter,
+        AzureMonitorMetricExporter,
+        AzureMonitorTraceExporter,
+    )
+
+    return [
+        AzureMonitorTraceExporter(connection_string=connection_string),
+        AzureMonitorLogExporter(connection_string=connection_string),
+        AzureMonitorMetricExporter(connection_string=connection_string),
+    ]
+
+
+def azure_monitor_active() -> bool:
+    """Is an Azure Monitor exporter genuinely attached to the live provider?
+
+    Looks for the exporter itself. Checking "is any span processor installed"
+    was fooled by the local OTLP exporter and reported Azure as working when it
+    was not.
+    """
+    provider = trace.get_tracer_provider()
+    processors = getattr(getattr(provider, "_active_span_processor", None),
+                         "_span_processors", ())
+    return any(
+        type(getattr(p, "span_exporter", None)).__name__ == "AzureMonitorTraceExporter"
+        for p in processors
+    )
 
 
 def recording() -> bool:

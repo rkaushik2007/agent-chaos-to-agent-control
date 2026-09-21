@@ -11,7 +11,7 @@
 UV ?= uv
 
 .DEFAULT_GOAL := help
-.PHONY: help install act1 act2 act3 act4 rehearse reset seed console doctor up down test live-toolbox
+.PHONY: help install act1 act2 act3 act4 rehearse reset seed console doctor up down test live-toolbox live-tools
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -58,3 +58,6 @@ test:  ## Run the test suite
 
 live-toolbox:  ## LIVE only - create/update the Foundry toolbox from config/toolbox.yaml
 	$(UV) run python infra/create_toolbox.py
+
+live-tools:  ## LIVE only - run the tool servers and the tunnel Foundry calls (leave running)
+	$(UV) run python infra/start_live_tools.py

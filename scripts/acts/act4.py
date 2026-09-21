@@ -241,19 +241,16 @@ def _open(console_url: str) -> None:
 
 
 async def _configure_azure_monitor() -> None:
-    """LIVE only: also export to the Foundry project's Application Insights.
+    """LIVE only: say whether spans are also reaching Application Insights.
 
-    Never fatal. A project without Application Insights attached still gets the
-    local collector, and an act that refuses to start because a second telemetry
-    sink is missing would be a worse trade than one trace UI short.
+    Configuration happens once, in `telemetry.configure()`, on the same provider
+    as the local collector. This only reports the truth about it.
     """
     from governance.settings import demo_mode
 
     if demo_mode() != "live":
         return
-    from governance.model_live import configure_azure_monitor_from_project
-
-    if await configure_azure_monitor_from_project():
+    if telemetry.azure_monitor_active():
         narrate.detail("Also exporting to the Foundry project's Application Insights.")
     else:
         narrate.warn("No Application Insights configured on the project; "

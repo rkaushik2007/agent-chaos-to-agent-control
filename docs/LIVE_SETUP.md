@@ -12,6 +12,21 @@ modes — that is the claim the session makes, and it is why the runbook can say
 > `agent-framework-foundry-hosting` are pre-release. Everything marked
 > **(preview)** below can change.
 
+## What exists in the verification project right now
+
+These were created for the demo and are **billable while they exist** (Application
+Insights is pay-per-GB with a free monthly grant; the rest are free or negligible).
+
+| Resource | Name | Where |
+|---|---|---|
+| Log Analytics workspace | `helix-agent-governance-law` | `<your-resource-group>` |
+| Application Insights | `helix-agent-governance-ai` | `<your-resource-group>` |
+| Project connection (AppInsights) | `helix-agent-governance-ai` | the Foundry project |
+| Toolbox | `helix-trial-tools`, versions 1 and 2, default **1** | the Foundry project |
+| Dev tunnel | `helix-trial-tools` (expires 30 days after creation) | your devtunnel account |
+
+Teardown is at the bottom of this page.
+
 ## What was actually verified, and what was not
 
 Verified end to end against a real Foundry project on 2026-09-18:
@@ -25,7 +40,7 @@ Verified end to end against a real Foundry project on 2026-09-18:
 | Consuming the toolbox over MCP with a bearer token | ✅ verified |
 | Per-agent filtering against the live endpoint | ✅ verified (client-side — see below) |
 | Act 2 and act 4 end to end in LIVE | ✅ verified |
-| Azure Monitor export from the project | ❌ **not verified** - this subscription has no Application Insights resource at all, so nothing was exported. The call reported success anyway; see below. |
+| Traces in Application Insights | ✅ verified — **all 20 spans** of an act 4 trace, including every `governance.policy` span with `entra.agent_id`, `governance.decision`, `governance.rule_id` and `data.classification` |
 | **Acting *as* an Entra agent identity** | ❌ **not possible today** — see below |
 | `agent_framework_foundry_hosting.FoundryToolbox` | ⚠️ not exercised — this repo connects over MCP instead, for the reasons in `governance/toolbox_live.py` |
 
@@ -225,16 +240,87 @@ identities**.
 
 ## Telemetry
 
-Local collector as usual (`docker compose up -d`). In LIVE the acts additionally
-call `FoundryChatClient.configure_azure_monitor()`, which reads the connection
-string from the project — nothing to copy. Set
-`APPLICATIONINSIGHTS_CONNECTION_STRING` to override. If the project has no
-Application Insights attached, the act says so and carries on with the local
-collector only.
+LIVE sends every span to **two places from one tracer provider**: the local
+collector (Aspire) and the Foundry project's Application Insights. The connection
+string is read from the project itself, so there is nothing to copy -
+`APPLICATIONINSIGHTS_CONNECTION_STRING` overrides it. MOCK never looks it up.
 
----
+### Two silent failures worth knowing about
+
+Both cost real time, and both *looked* like success.
+
+**1. No Application Insights at all.** `FoundryChatClient.configure_azure_monitor()`
+does not raise when the project has none attached. It logs one line and installs
+nothing. A "did it throw?" check reports success while exporting zero spans.
+
+**2. Two providers.** The obvious sequence - configure OTLP, then call
+`configure_azure_monitor()` - does not work. OpenTelemetry lets the global
+provider be set once; the second call logs *"Overriding of current TracerProvider
+is not allowed"* and is ignored. Its HTTP auto-instrumentation still ships a few
+request spans to Azure, so **traces appear in Application Insights** - and it is
+easy to stop looking there. But none of them are the ones that matter.
+
+Measured on the same act 4 trace:
+
+| | before | after |
+|---|---|---|
+| spans in Application Insights | 7 | 20 |
+| `governance.policy` | 0 | 3 |
+| `invoke_agent` / `chat` / `execute_tool` | 0 | 8 |
+
+The fix is to pass the Azure Monitor exporters *into*
+`configure_otel_providers(exporters=[...])`, so one provider feeds both
+destinations - see `governance/telemetry.py`. The act now reports Azure export
+only when an `AzureMonitorTraceExporter` is genuinely attached.
+
+### Attaching Application Insights to a project
+
+In the portal: **Foundry (new) → your project → Agents → Traces → Connect**, or
+**Manage → Project details → Connected resources → Add connection → Application
+Insights**. Or, as the verification did, by CLI:
+
+```bash
+az monitor log-analytics workspace create -g <rg> -n <name>-law -l <region>
+az monitor app-insights component create -a <name>-ai -g <rg> -l <region> --workspace <law-resource-id>
+```
+
+then a `PUT` of an `AppInsights` connection to
+`.../accounts/<account>/projects/<project>/connections/<name>?api-version=2025-06-01`
+with `authType: ApiKey`, the component's resource id as `target` and
+`metadata.ResourceId`, and its connection string as `credentials.key`.
+On Git Bash set `MSYS_NO_PATHCONV=1` first, or resource ids are rewritten as
+Windows paths.
+
+### Seeing the traces
+
+- **Application Insights** (Azure portal → `helix-agent-governance-ai`): verified.
+  *Transaction search*, or *Logs* with
+  ```kusto
+  union dependencies, requests
+  | where name startswith "governance.policy"
+  | project timestamp, name,
+      agent    = customDimensions["entra.agent_id"],
+      decision = customDimensions["governance.decision"],
+      rule     = customDimensions["governance.rule_id"]
+  ```
+  Allow two or three minutes for ingestion.
+- **Foundry portal → Agents → Traces**: documented as the place Foundry shows
+  traces, but **not verified here**. It is built around agents Foundry knows
+  about, and these agents are not registered in Foundry - see *Registering the
+  agents* below.
 
 ## Running LIVE
+
+First, in its own terminal, start what the toolbox calls - and leave it running:
+
+```bash
+uv run python infra/start_live_tools.py      # or: make live-tools
+```
+
+It starts both catalogue servers and hosts the tunnel. The toolbox *object* is
+visible in Foundry either way; only calling its tools needs this running.
+
+Then, in another terminal:
 
 ```bash
 DEMO_MODE=live uv run demo doctor
@@ -280,13 +366,40 @@ Check with `az cognitiveservices account deployment list -n <account> -g <rg>`.
 
 ---
 
+## Registering the agents (not done)
+
+`trial_ops`, `safety_triage` and `supply` are Agent Framework objects inside the
+act's process. **Foundry does not know they exist.** Foundry supports agents that
+run outside it - *Operate → Overview → Register asset* - which then appear under
+*Operate → Assets* with their own traces. It needs:
+
+- an **AI gateway** (Azure API Management) on the Foundry resource;
+- Application Insights on the project (done);
+- an **Agent URL** Foundry can proxy to - these agents do not currently expose
+  one, so each would need to be served over A2A.
+
+Foundry attributes traces by `gen_ai.agent.id`, which the demo already emits
+(`Agent(id=...)` in `agents/runner.py`), so traces would attach without code
+changes once the agents are registered.
+
 ## Teardown
 
+Everything created for the demo, most reversible first:
+
 ```bash
+# the toolbox (its endpoint stops working immediately)
 uv run python -c "import os;from azure.ai.projects import AIProjectClient;from azure.identity import AzureCliCredential;from governance import settings;settings.load_env();c=AIProjectClient(endpoint=os.environ['FOUNDRY_PROJECT_ENDPOINT'],credential=AzureCliCredential());c.toolboxes.delete(name=os.environ['TOOLBOX_NAME']);print('deleted')"
-devtunnel delete helix-clinical-tools -f
+
+# the tunnel
+devtunnel delete helix-trial-tools -f
+
+# Application Insights and its workspace (this deletes the stored traces)
+az monitor app-insights component delete -a helix-agent-governance-ai -g <your-resource-group>
+az monitor log-analytics workspace delete -n helix-agent-governance-law -g <your-resource-group> --yes
+
 docker compose down
 ```
 
-Deleting the toolbox breaks its endpoint immediately. Clear `TOOLBOX_ENDPOINT`
-from `.env` afterwards.
+Remove the `AppInsights` connection from the project too (Manage → Project
+details → Connected resources), or it will point at a deleted resource.
+Clear `TOOLBOX_ENDPOINT` from `.env` afterwards.

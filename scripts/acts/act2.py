@@ -122,6 +122,15 @@ async def run(*, interactive: bool = True) -> ActResult:
     async with clinical_tools_server() as upstream:
         # LocalToolbox in MOCK, the Foundry toolbox endpoint in LIVE.
         async with tool_source_factory()(upstream, identity, reg) as toolbox:
+            # A Foundry toolbox persists between runs, and this act ends by
+            # promoting v2. Without resetting, a second LIVE run starts on v2,
+            # "promotes" v2 to v2, gains nothing, and fails on stage. The local
+            # toolbox is rebuilt each run and always starts at v1, so this only
+            # does anything in LIVE.
+            starting = reg.default_version
+            if toolbox.version not in (starting, reg.live_version_of(starting)):
+                toolbox.promote(starting)
+
             # ------------------------------------------------------- toolbox
             narrate.step(f"One endpoint: [bold]{toolbox.endpoint}[/bold]")
             narrate.detail(
