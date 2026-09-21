@@ -25,15 +25,24 @@ from scripts import narrate
 from scripts.logging_setup import quiet, quiet_asyncio
 
 
+def run_async(make_coro):
+    """Run a coroutine with the demo's asyncio noise suppression in place.
+
+    Every entry point goes through here. `rehearse` did not, which is why the
+    one command whose whole job is to look clean was the noisiest.
+    """
+
+    async def go():
+        quiet_asyncio()
+        return await make_coro()
+
+    return asyncio.run(go())
+
+
 def _run_act(number: int) -> Callable[[argparse.Namespace], int]:
     def runner(args: argparse.Namespace) -> int:
         module = __import__(f"scripts.acts.act{number}", fromlist=["run"])
-
-        async def go():
-            quiet_asyncio()
-            return await module.run(interactive=not args.non_interactive)
-
-        result = asyncio.run(go())
+        result = run_async(lambda: module.run(interactive=not args.non_interactive))
         return 0 if result is not None else 1
 
     return runner
@@ -66,7 +75,7 @@ def _cmd_reset(args: argparse.Namespace) -> int:
 def _cmd_rehearse(args: argparse.Namespace) -> int:
     from scripts.rehearse import rehearse
 
-    return asyncio.run(rehearse())
+    return run_async(rehearse)
 
 
 def _cmd_console(args: argparse.Namespace) -> int:

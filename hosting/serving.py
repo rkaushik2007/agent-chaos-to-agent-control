@@ -36,6 +36,29 @@ import uvicorn
 START_TIMEOUT = 15.0
 SHUTDOWN_TIMEOUT = 10.0
 
+# Windows' proactor loop reports these when the far end of an already-finished
+# HTTP connection goes away. With several short-lived loopback servers per act
+# it is unavoidable, it means nothing, and a traceback on a projector reads as a
+# crash. Swallowed on every loop that could raise one - including each server's
+# own thread loop, which is the one the acts were still leaking from.
+BENIGN_TRANSPORT_ERRORS = (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)
+
+
+def install_quiet_exception_handler(loop: asyncio.AbstractEventLoop | None = None) -> None:
+    """Drop benign socket teardown errors on `loop` (default: the running one)."""
+    loop = loop or asyncio.get_running_loop()
+    previous = loop.get_exception_handler()
+
+    def handler(inner_loop, context) -> None:
+        if isinstance(context.get("exception"), BENIGN_TRANSPORT_ERRORS):
+            return
+        if previous is not None:
+            previous(inner_loop, context)
+        else:
+            inner_loop.default_exception_handler(context)
+
+    loop.set_exception_handler(handler)
+
 
 def bind_loopback(port: int = 0) -> socket.socket:
     """A bound, listening loopback socket.
@@ -102,8 +125,13 @@ async def serve_asgi(app=None, *, app_factory=None, port: int = 0) -> AsyncItera
     def _run() -> None:
         # uvicorn skips signal capture off the main thread, so it will not touch
         # this process's Ctrl-C handling.
+        async def _serve() -> None:
+            # This thread has its own event loop, so it needs its own handler.
+            install_quiet_exception_handler()
+            await server.serve(sockets=[sock])
+
         try:
-            asyncio.run(server.serve(sockets=[sock]))
+            asyncio.run(_serve())
         except BaseException as exc:  # noqa: BLE001 - surfaced to the caller below
             failure.append(exc)
         finally:

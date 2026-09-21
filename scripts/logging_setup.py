@@ -61,6 +61,17 @@ def quiet(verbose: bool | None = None) -> None:
 
     # A collector that is not running must cost a retry, not a wall of red on
     # the projector. The spans still record and still carry trace ids.
+    # uvicorn logs this at ERROR every time a server with a graceful-shutdown
+    # timeout stops with anything still connected - which, for servers that live
+    # for one act, is most of them. It is expected, it is not a failure, and with
+    # `log_config=None` it reaches stderr through logging's last-resort handler
+    # no matter what level the logger is set to. A filter on the logger is
+    # checked before any handler, so it stops there. Every other uvicorn error
+    # still gets through.
+    logging.getLogger("uvicorn.error").addFilter(
+        lambda record: "timeout graceful shutdown exceeded" not in record.getMessage()
+    )
+
     for name in (
         "opentelemetry.exporter.otlp.proto.grpc.exporter",
         "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
@@ -73,28 +84,14 @@ def quiet(verbose: bool | None = None) -> None:
 def quiet_asyncio(verbose: bool | None = None) -> None:
     """Stop benign socket teardown from printing a traceback mid-act.
 
-    Windows' proactor loop reports `ConnectionResetError` when the far end of an
-    already-finished HTTP connection goes away. It is noise, it is unavoidable
-    with several short-lived loopback servers per act, and a traceback on a
-    projector reads as a failure.
+    Installs on the *calling* loop. Each server thread installs its own; see
+    `hosting.serving`.
     """
-    import asyncio
-
     if verbose is None:
         verbose = os.getenv("DEMO_VERBOSE", "").strip().lower() in ("1", "true", "yes", "on")
     if verbose:
         return
 
-    loop = asyncio.get_running_loop()
-    default = loop.get_exception_handler()
+    from hosting.serving import install_quiet_exception_handler
 
-    def handler(loop_, context) -> None:
-        exception = context.get("exception")
-        if isinstance(exception, (ConnectionResetError, ConnectionAbortedError)):
-            return
-        if default is not None:
-            default(loop_, context)
-        else:
-            loop_.default_exception_handler(context)
-
-    loop.set_exception_handler(handler)
+    install_quiet_exception_handler()
