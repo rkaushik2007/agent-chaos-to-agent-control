@@ -16,6 +16,25 @@ from collections.abc import AsyncIterator
 from hosting import serve_asgi
 
 
+async def _another_console_is_running(port: int) -> bool:
+    """Is a *different* copy of this console already on that port?
+
+    Worth knowing, because the approval queue is per-process. A console started
+    with `demo console` has its own empty queue, so pressing Approve there does
+    nothing for a waiting act - it just sits there until it times out and
+    denies. That is a silent, confusing failure at exactly the wrong moment.
+    """
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=0.5) as client:
+            response = await client.get(f"http://127.0.0.1:{port}/api/health")
+        payload = response.json()
+    except Exception:
+        return False
+    return isinstance(payload, dict) and "pending_approvals" in payload
+
+
 @contextlib.asynccontextmanager
 async def console_server(port: int | None = None) -> AsyncIterator[str]:
     """Serve the console on loopback for the duration of the block.
@@ -45,6 +64,12 @@ async def console_server(port: int | None = None) -> AsyncIterator[str]:
                 f"port {preferred} is taken by something else, so the console is "
                 f"on {actual} instead. Use the URL below, not the one in the runbook."
             )
+            if await _another_console_is_running(preferred):
+                narrate.error(
+                    f"and the thing on {preferred} is another copy of this console. "
+                    "Approvals clicked there will NOT reach this act - the queue "
+                    "lives in the act's own process. Close it and use the URL below."
+                )
         try:
             yield base_url
         finally:

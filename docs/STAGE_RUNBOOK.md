@@ -18,7 +18,11 @@ decision the talk depends on; a green rehearsal is the only claim worth making a
 Then open and leave open:
 
 - <http://localhost:18888> — the trace UI (Aspire Dashboard)
-- <http://localhost:8787> — the governance console (acts 3 and 4 start it themselves)
+
+**Do not** start the console yourself with `uv run demo console`. Acts 3 and 4
+start their own on <http://localhost:8787>, and only that one can answer an
+approval — the queue lives in the act's process. Open the browser tab once act 3
+is running.
 
 ---
 
@@ -157,6 +161,14 @@ Act 4 still runs and still shows every decision without a collector; only the tr
 Say so and move on — the audit table it prints has the same content.
 
 ### The Approve button does nothing
+
+**First check you are on the console the act started.** The approval queue lives
+in the act's own process, so a console you started separately with
+`uv run demo console` has its own empty queue and its buttons do nothing for a
+running act. Act 3 detects this and says so in red - but the fix is simply to
+close the standalone console and use the URL the act printed.
+
+
 
 The console is served by the act itself, so it only works **while the act is running**. If you approve
 after the timeout the act has already denied, which is the correct behaviour and a fine thing to say out
