@@ -25,7 +25,7 @@ Verified end to end against a real Foundry project on 2026-09-18:
 | Consuming the toolbox over MCP with a bearer token | ✅ verified |
 | Per-agent filtering against the live endpoint | ✅ verified (client-side — see below) |
 | Act 2 and act 4 end to end in LIVE | ✅ verified |
-| Azure Monitor export from the project | ✅ verified (`configure_azure_monitor` reported success) |
+| Azure Monitor export from the project | ❌ **not verified** - this subscription has no Application Insights resource at all, so nothing was exported. The call reported success anyway; see below. |
 | **Acting *as* an Entra agent identity** | ❌ **not possible today** — see below |
 | `agent_framework_foundry_hosting.FoundryToolbox` | ⚠️ not exercised — this repo connects over MCP instead, for the reasons in `governance/toolbox_live.py` |
 

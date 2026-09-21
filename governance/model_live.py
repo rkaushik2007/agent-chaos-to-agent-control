@@ -90,12 +90,54 @@ async def configure_azure_monitor_from_project() -> bool:
         enable_instrumentation()
         return True
 
+    # `FoundryChatClient.configure_azure_monitor()` does not raise when the
+    # project has no Application Insights attached - it logs and installs
+    # nothing. Returning True on "no exception" therefore reported success while
+    # exporting precisely zero spans, which is the worst possible answer: the
+    # act says telemetry is flowing to Azure and it is not. Ask the project for
+    # a connection string first, and only claim success if one exists.
     try:
         client = foundry_chat_client()
+        if not await _project_has_application_insights():
+            return False
         await client.configure_azure_monitor(enable_live_metrics=True)
-        return True
     except Exception:  # noqa: BLE001 - reported by the caller, never fatal
         return False
+    return _azure_monitor_is_exporting()
+
+
+async def _project_has_application_insights() -> bool:
+    """Does the Foundry project have an Application Insights resource attached?"""
+    import os
+
+    from azure.ai.projects.aio import AIProjectClient
+    from azure.identity.aio import AzureCliCredential
+
+    endpoint = os.getenv("FOUNDRY_PROJECT_ENDPOINT", "").strip()
+    if not endpoint:
+        return False
+    try:
+        async with AzureCliCredential() as credential:
+            async with AIProjectClient(endpoint=endpoint, credential=credential) as client:
+                connection_string = (
+                    await client.telemetry.get_application_insights_connection_string()
+                )
+        return bool(connection_string)
+    except Exception:  # noqa: BLE001 - absence is the common case, not an error
+        return False
+
+
+def _azure_monitor_is_exporting() -> bool:
+    """Did a span processor actually get installed?
+
+    The only honest check. Anything else is trusting a call that stays quiet
+    when it does nothing.
+    """
+    from opentelemetry import trace
+
+    provider = trace.get_tracer_provider()
+    active = getattr(provider, "_active_span_processor", None)
+    return bool(getattr(active, "_span_processors", ()))
 
 
 def reset() -> None:
