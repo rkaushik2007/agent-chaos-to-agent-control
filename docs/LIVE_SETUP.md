@@ -236,16 +236,16 @@ uv run python infra/register_agents.py --env    # prints the lines below
 ```
 
 ```bash
-TRIAL_OPS_AGENT_IDENTITY_ID=<object-id>-…      # trial-ops-<suffix>
-SAFETY_TRIAGE_AGENT_IDENTITY_ID=<object-id>-…  # safety-triage-<suffix>
-SUPPLY_AGENT_IDENTITY_ID=<object-id>-…         # supply-<suffix>
-REQUIRE_AGENT_IDENTITY=true                 # refuse to start without them
+TRIAL_OPS_AGENT_IDENTITY_ID=<object-id>      # blueprint trial-ops-<suffix>
+SAFETY_TRIAGE_AGENT_IDENTITY_ID=<object-id>  # blueprint safety-triage-<suffix>
+SUPPLY_AGENT_IDENTITY_ID=<object-id>         # blueprint supply-<suffix>
+REQUIRE_AGENT_IDENTITY=true                  # refuse to start without them
 ```
 
-Verified: with these set, an act 4 audit table shows `<object-id…` and
-`<object-id…` where it used to show `unconfigured:trial_ops`, and every
-`governance.policy` span in Application Insights carries the same id as
-`entra.agent_id`.
+The ids are tenant-specific, so they are not written down here - `--env` prints
+your own. Verified: with them set, an act 4 audit table shows real object ids
+where it used to show `unconfigured:trial_ops`, and every `governance.policy`
+span in Application Insights carries the same id as `entra.agent_id`.
 
 This does **not** lift the limitation above. The identity is real and per-agent;
 acquiring a token whose *subject* is that identity is still Agent Service's job.
