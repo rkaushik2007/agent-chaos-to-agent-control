@@ -32,6 +32,11 @@ from opentelemetry.trace import Span, SpanKind, format_span_id, format_trace_id
 # cannot drift apart.
 ATTR_AGENT_ID = "entra.agent_id"
 ATTR_AGENT = "helix.agent"
+# The OpenTelemetry GenAI convention's agent id. Agent Framework already puts it
+# on its own `invoke_agent` spans; we repeat it on the governance span so a
+# registered Foundry agent's trace view attributes the *decision* to the agent
+# too, and not only the invocation. See infra/register_agents.py.
+ATTR_GENAI_AGENT_ID = "gen_ai.agent.id"
 ATTR_DECISION = "governance.decision"
 ATTR_RULE_ID = "governance.rule_id"
 ATTR_CLASSIFICATION = "data.classification"
@@ -130,9 +135,10 @@ def _application_insights_connection_string() -> str | None:
         return None
     try:
         from azure.ai.projects import AIProjectClient
-        from azure.identity import AzureCliCredential
 
-        with AIProjectClient(endpoint=endpoint, credential=AzureCliCredential()) as client:
+        from governance.credentials import credential
+
+        with AIProjectClient(endpoint=endpoint, credential=credential()) as client:
             return client.telemetry.get_application_insights_connection_string() or None
     except Exception:  # noqa: BLE001 - no App Insights is the common case
         return None
@@ -219,6 +225,7 @@ def policy_span(
     """
     attributes = {
         ATTR_AGENT: agent,
+        ATTR_GENAI_AGENT_ID: agent,
         ATTR_TARGET: target,
         ATTR_KIND: kind,
         ATTR_ENGINE: engine,

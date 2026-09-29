@@ -188,7 +188,7 @@ config/           agents.yaml, policy.yaml, toolbox.yaml
 data/             seeded synthetic fixtures (committed, deterministic)
 hosting/          loopback ASGI hosting used by the servers above
 scripts/          demo CLI, the four acts, rehearsal, doctor, seed
-infra/            LIVE: create and promote the Foundry toolbox
+infra/            LIVE: the Foundry toolbox, and registering the agents
 tests/  docs/
 ```
 
@@ -217,8 +217,9 @@ uv run pytest -q -m "not slow"   # skip the end-to-end rehearsal
 - **[docs/STAGE_RUNBOOK.md](docs/STAGE_RUNBOOK.md)** — pre-talk checklist, the exact command sequence,
   what to say if LIVE fails, and how to reset between rehearsals.
 - **[docs/LIVE_SETUP.md](docs/LIVE_SETUP.md)** — Foundry project, model deployment, Toolbox (preview),
-  Entra agent identities, Azure Monitor, env vars and rough costs. Every preview dependency is marked,
-  and so is everything I could not verify.
+  registering the agents as Foundry external agents (which is also what provisions their Entra agent
+  identities), Azure Monitor, env vars and rough costs. Every preview dependency is marked, and so is
+  everything I could not verify.
 
 ## Licence and provenance
 

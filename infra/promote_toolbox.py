@@ -30,14 +30,15 @@ from governance.toolbox_live import consumer_endpoint  # noqa: E402
 
 def promote(version: str) -> int:
     from azure.ai.projects import AIProjectClient
-    from azure.identity import AzureCliCredential
+
+    from governance.credentials import credential
 
     endpoint = os.environ.get("FOUNDRY_PROJECT_ENDPOINT", "").strip()
     toolbox_name = os.environ.get("TOOLBOX_NAME", "helix-clinical-tools").strip()
     if not endpoint:
         raise SystemExit("FOUNDRY_PROJECT_ENDPOINT is not set. See docs/LIVE_SETUP.md.")
 
-    with AIProjectClient(endpoint=endpoint, credential=AzureCliCredential()) as client:
+    with AIProjectClient(endpoint=endpoint, credential=credential()) as client:
         before = getattr(client.toolboxes.get(name=toolbox_name), "default_version", "?") \
             if hasattr(client.toolboxes, "get") else "?"
         toolbox = client.toolboxes.update(name=toolbox_name, default_version=version)

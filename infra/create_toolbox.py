@@ -37,12 +37,13 @@ from governance.toolbox_live import consumer_endpoint, version_endpoint  # noqa:
 
 def _client():
     from azure.ai.projects import AIProjectClient
-    from azure.identity import AzureCliCredential
+
+    from governance.credentials import credential
 
     endpoint = os.environ.get("FOUNDRY_PROJECT_ENDPOINT", "").strip()
     if not endpoint:
         raise SystemExit("FOUNDRY_PROJECT_ENDPOINT is not set. See docs/LIVE_SETUP.md.")
-    return AIProjectClient(endpoint=endpoint, credential=AzureCliCredential()), endpoint
+    return AIProjectClient(endpoint=endpoint, credential=credential()), endpoint
 
 
 def server_label(version: str) -> str:

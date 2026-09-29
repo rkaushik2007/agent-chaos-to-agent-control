@@ -23,6 +23,7 @@ Insights is pay-per-GB with a free monthly grant; the rest are free or negligibl
 | Application Insights | `helix-agent-governance-ai` | `<your-resource-group>` |
 | Project connection (AppInsights) | `helix-agent-governance-ai` | the Foundry project |
 | Toolbox | `helix-trial-tools`, versions 1 and 2, default **1** | the Foundry project |
+| External agent registrations | `trial-ops`, `safety-triage`, `supply` (+ an Entra agent identity each) | the Foundry project |
 | Dev tunnel | `helix-trial-tools` (expires 30 days after creation) | your devtunnel account |
 
 Teardown is at the bottom of this page.
@@ -41,7 +42,11 @@ Verified end to end against a real Foundry project on 2026-09-18:
 | Per-agent filtering against the live endpoint | ✅ verified (client-side — see below) |
 | Act 2 and act 4 end to end in LIVE | ✅ verified |
 | Traces in Application Insights | ✅ verified — **all 20 spans** of an act 4 trace, including every `governance.policy` span with `entra.agent_id`, `governance.decision`, `governance.rule_id` and `data.classification` |
-| **Acting *as* an Entra agent identity** | ❌ **not possible today** — see below |
+| Registering the agents as Foundry **external agents** (preview) | ✅ verified — three registrations, no AI gateway, no endpoint, no charge |
+| A per-agent **Entra agent identity**, provisioned by registering | ✅ verified — real object ids now stamped on every span and audit row |
+| `governance.policy` spans attributable to a registered agent | ✅ verified — each carries `gen_ai.agent.id` as well as `entra.agent_id` |
+| Foundry portal **Agents → _agent_ → Traces** | ⚠️ not verified by me — the spans and the registration both check out, the portal view is yours to open |
+| **Acting *as* an Entra agent identity** | ❌ **still not possible** — the identity exists, the token exchange does not |
 | `agent_framework_foundry_hosting.FoundryToolbox` | ⚠️ not exercised — this repo connects over MCP instead, for the reasons in `governance/toolbox_live.py` |
 
 ---
@@ -218,16 +223,34 @@ So `EntraAgentIdentityProvider` does two things that are both real:
 **On stage, say "this is the agent's identity, and this is the token we present".
 Do not say "this token was issued to the agent identity".**
 
-Find the ids in the portal: the Foundry project's **Overview → JSON View** for
-the shared project identity, or a published agent application's JSON View for a
-distinct one. Then:
+### Where the ids come from
+
+Registering the agents is what creates them. Foundry mints a
+`ManagedAgentIdentityBlueprint` and an instance identity per external agent
+registration, so each agent gets **its own** directory object rather than sharing
+the project identity:
 
 ```bash
-TRIAL_OPS_AGENT_IDENTITY_ID=<agentIdentityId>
-SAFETY_TRIAGE_AGENT_IDENTITY_ID=<agentIdentityId>
-SUPPLY_AGENT_IDENTITY_ID=<agentIdentityId>
-REQUIRE_AGENT_IDENTITY=true     # refuse to start without them
+uv run python infra/register_agents.py          # creates the identities
+uv run python infra/register_agents.py --env    # prints the lines below
 ```
+
+```bash
+TRIAL_OPS_AGENT_IDENTITY_ID=<object-id>-…      # trial-ops-<suffix>
+SAFETY_TRIAGE_AGENT_IDENTITY_ID=<object-id>-…  # safety-triage-<suffix>
+SUPPLY_AGENT_IDENTITY_ID=<object-id>-…         # supply-<suffix>
+REQUIRE_AGENT_IDENTITY=true                 # refuse to start without them
+```
+
+Verified: with these set, an act 4 audit table shows `<object-id…` and
+`<object-id…` where it used to show `unconfigured:trial_ops`, and every
+`governance.policy` span in Application Insights carries the same id as
+`entra.agent_id`.
+
+This does **not** lift the limitation above. The identity is real and per-agent;
+acquiring a token whose *subject* is that identity is still Agent Service's job.
+What changed is that the id decisions are attributed to is now a directory object
+an administrator can govern, instead of a label.
 
 With `REQUIRE_AGENT_IDENTITY=false` the provider runs and labels the identity
 `unconfigured:<agent>` — visibly not an Entra id, so a rehearsal trace can never
@@ -358,6 +381,7 @@ Small. The only metered items are model tokens and Application Insights ingest.
 | A full LIVE act | a few thousand tokens — cents on a `gpt-4o`-class deployment |
 | Toolbox (preview) | no separate charge observed; the tools behind it may bill |
 | Application Insights | a few MB per run, within most free grants |
+| External agent registration | free — metadata only. The *other* path, control-plane custom agents, needs Azure API Management and is not free; this repo does not use it. |
 | Dev tunnel | free |
 | Aspire Dashboard | local container, free |
 
@@ -366,27 +390,62 @@ Check with `az cognitiveservices account deployment list -n <account> -g <rg>`.
 
 ---
 
-## Registering the agents (not done)
+## Registering the agents in Foundry
+
+```bash
+uv run python infra/register_agents.py           # register all three
+uv run python infra/register_agents.py --show    # names, otel ids, Entra identities
+uv run python infra/register_agents.py --env     # the .env lines to paste
+uv run python infra/register_agents.py --delete  # remove them
+```
 
 `trial_ops`, `safety_triage` and `supply` are Agent Framework objects inside the
-act's process. **Foundry does not know they exist.** Foundry supports agents that
-run outside it - *Operate → Overview → Register asset* - which then appear under
-*Operate → Assets* with their own traces. It needs:
+act's process, so by default Foundry has a toolbox to show and nothing that looks
+like an agent. Registering them as **external agents** closes that gap for
+nothing: one metadata record per agent saying "this agent exists and emits
+telemetry under this id". Foundry matches spans in the project's Application
+Insights by `gen_ai.agent.id` and shows them under **Agents → _agent_ →
+Traces**. Foundry does not host, proxy or invoke anything.
 
-- an **AI gateway** (Azure API Management) on the Foundry resource;
-- Application Insights on the project (done);
-- an **Agent URL** Foundry can proxy to - these agents do not currently expose
-  one, so each would need to be served over A2A.
+The only prerequisite that matters is Application Insights connected to the
+project, which act 4 already needs.
 
-Foundry attributes traces by `gen_ai.agent.id`, which the demo already emits
-(`Agent(id=...)` in `agents/runner.py`), so traces would attach without code
-changes once the agents are registered.
+Preview: create and update requests need the
+`Foundry-Features: ExternalAgents=V1Preview` header, which the Python SDK sends
+when `AIProjectClient` is built with `allow_preview=True`.
+
+`shadow_agent` is not registered, deliberately. The registry is the only source
+of an agent's rights and Foundry's list should agree: an agent nobody owns is an
+agent nobody can see.
+
+### Two things the docs get wrong
+
+| | |
+|---|---|
+| **Name characters** | The docs allow "alphanumeric characters, hyphens, and underscores". The service rejects `safety_triage` with *"Must start and end with alphanumeric characters, can contain hyphens in the middle"*. So the Foundry names are `trial-ops`, `safety-triage` and `supply`, while `otel_agent_id` carries the underscored id the spans actually use. `infra/register_agents.py` derives both from the registry key. |
+| **Entra identities** | Not mentioned on the external-agent page. Registering an agent makes Foundry mint a `ManagedAgentIdentityBlueprint` and an instance identity for it — a real per-agent directory object, even though Foundry never runs the agent. See below. |
+
+### Why not *Operate → Register asset*
+
+That is the other path — Foundry **control plane** custom agents — and it is a
+different thing. It gives a block/unblock switch and a trace per HTTP call, but
+it needs an **AI gateway (Azure API Management)** in front, one exclusive
+reachable endpoint per agent, and it issues a new client URL that callers must
+use instead of the original. It governs the *transport*.
+
+This repo's argument is that governance belongs at the tool and delegation
+boundary, which is where the middleware sits — so the external-agent path is the
+honest fit, and it costs nothing. If you want the gateway story too, the docs are
+at [register-custom-agent](https://learn.microsoft.com/en-us/azure/foundry/control-plane/register-custom-agent).
 
 ## Teardown
 
 Everything created for the demo, most reversible first:
 
 ```bash
+# the agent registrations (the agents keep running; their Entra identities go)
+uv run python infra/register_agents.py --delete
+
 # the toolbox (its endpoint stops working immediately)
 uv run python -c "import os;from azure.ai.projects import AIProjectClient;from azure.identity import AzureCliCredential;from governance import settings;settings.load_env();c=AIProjectClient(endpoint=os.environ['FOUNDRY_PROJECT_ENDPOINT'],credential=AzureCliCredential());c.toolboxes.delete(name=os.environ['TOOLBOX_NAME']);print('deleted')"
 

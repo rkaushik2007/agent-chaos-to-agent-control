@@ -265,3 +265,158 @@ def test_azure_monitor_exporters_cover_traces_logs_and_metrics():
         "AzureMonitorLogExporter",
         "AzureMonitorMetricExporter",
     }
+
+
+# ---------------------------------------------------------------------------
+# The Azure CLI credential timeout
+# ---------------------------------------------------------------------------
+
+def test_the_cli_credential_gets_longer_than_the_ten_second_default():
+    """azure-identity allows `az` ten seconds, which a slow network exceeds.
+
+    It then raises CredentialUnavailableError("Failed to invoke the Azure CLI"),
+    which reads like a broken install. It happened while building this repo.
+    """
+    from governance import credentials
+
+    assert credentials.cli_process_timeout() > 10
+
+
+def test_the_cli_timeout_can_be_raised_further(monkeypatch):
+    from governance import credentials
+
+    monkeypatch.setenv("AZURE_CLI_PROCESS_TIMEOUT", "90")
+    assert credentials.cli_process_timeout() == 90
+
+
+def test_a_nonsense_cli_timeout_falls_back_instead_of_crashing(monkeypatch):
+    from governance import credentials
+
+    monkeypatch.setenv("AZURE_CLI_PROCESS_TIMEOUT", "soon")
+    assert credentials.cli_process_timeout() == credentials.DEFAULT_CLI_PROCESS_TIMEOUT
+
+
+def test_the_cli_credential_is_the_default_and_can_be_turned_off(monkeypatch):
+    from governance import credentials
+
+    monkeypatch.delenv("AZURE_USE_CLI_CREDENTIAL", raising=False)
+    assert credentials.use_cli_credential() is True
+    monkeypatch.setenv("AZURE_USE_CLI_CREDENTIAL", "false")
+    assert credentials.use_cli_credential() is False
+
+
+# ---------------------------------------------------------------------------
+# Registering the agents in Foundry as external agents
+# ---------------------------------------------------------------------------
+
+def test_the_registered_otel_id_is_what_the_agent_actually_emits():
+    """`gen_ai.agent.id` is the registry key, because that is what runner sets.
+
+    `agents.runner` builds `Agent(id=principal.agent_id)`, so if these two ever
+    disagree Foundry matches nothing and the trace view sits empty.
+    """
+    from infra.register_agents import otel_agent_id
+
+    reg = registry()
+    for agent_id in reg.agents:
+        assert otel_agent_id(reg.require_agent(agent_id)) == agent_id
+
+
+def test_foundry_agent_names_replace_the_underscores():
+    """The service rejects underscores despite the docs allowing them.
+
+    Verified against the live API: `safety_triage` fails with "Must start and
+    end with alphanumeric characters, can contain hyphens in the middle".
+    """
+    from infra.register_agents import foundry_agent_name
+
+    reg = registry()
+    for agent_id in reg.agents:
+        name = foundry_agent_name(reg.require_agent(agent_id))
+        assert "_" not in name
+        assert name[0].isalnum() and name[-1].isalnum()
+        assert len(name) <= 63
+
+
+def test_the_identity_variable_names_match_the_registry_file():
+    """The env var this prints must be the one agents.yaml expands.
+
+    Otherwise `--env` writes lines nothing reads, and every span keeps saying
+    `unconfigured:<agent>` while looking configured.
+    """
+    from governance import settings
+    from infra.register_agents import identity_env_var
+
+    text = settings.AGENTS_FILE.read_text(encoding="utf-8")
+    reg = registry()
+    for agent_id in reg.agents:
+        variable = identity_env_var(reg.require_agent(agent_id))
+        assert f"${{{variable}}}" in text, f"{variable} is not used by agents.yaml"
+
+
+def test_the_shadow_agent_is_not_registered_in_foundry():
+    """The asset list should say what the registry says: nobody owns it."""
+    reg = registry()
+
+    assert "shadow_agent" not in reg.agents
+
+
+def test_the_foundry_metadata_carries_owner_and_clearance():
+    from infra.register_agents import metadata_for
+
+    metadata = metadata_for(registry().require_agent("safety_triage"))
+
+    assert metadata["owner"] == "pv-safety@helixtx.example"
+    assert metadata["business_unit"] == "Pharmacovigilance"
+    assert metadata["data_clearance"] == "internal,phi"
+    # Values have to be strings; the service rejects anything else.
+    assert all(isinstance(value, str) for value in metadata.values())
+
+
+# ---------------------------------------------------------------------------
+# The governance span is attributable to a registered agent
+# ---------------------------------------------------------------------------
+
+def test_the_governance_span_carries_the_genai_agent_id(monkeypatch):
+    """Foundry attributes a span to a registered agent by `gen_ai.agent.id`.
+
+    Without it the governance decision lands in Application Insights but not in
+    the agent's trace view, which is the one place the audience will look.
+    """
+    import contextlib
+
+    from governance import telemetry
+
+    captured: dict = {}
+
+    class _Span:
+        def set_attribute(self, *args):
+            pass
+
+        def add_event(self, *args, **kwargs):
+            pass
+
+    class _Tracer:
+        @contextlib.contextmanager
+        def start_as_current_span(self, name, **kwargs):
+            captured["name"] = name
+            captured["attributes"] = kwargs.get("attributes", {})
+            yield _Span()
+
+    monkeypatch.setattr(telemetry, "tracer", lambda: _Tracer())
+    with telemetry.policy_span(
+        agent="trial_ops",
+        entra_agent_id="11111111-2222-3333-4444-555555555555",
+        target="search_docs",
+        kind="tool",
+        classification="internal",
+        engine="middleware",
+        mode="live",
+    ):
+        pass
+
+    attributes = captured["attributes"]
+    assert attributes[telemetry.ATTR_GENAI_AGENT_ID] == "trial_ops"
+    # Both ids stay on the span: one is the OpenTelemetry convention Foundry
+    # matches on, the other is the Entra object an administrator governs.
+    assert attributes[telemetry.ATTR_AGENT_ID] == "11111111-2222-3333-4444-555555555555"

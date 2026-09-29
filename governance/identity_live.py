@@ -87,17 +87,9 @@ class EntraAgentIdentityProvider:
 
     def credential(self):
         if self._credential is None:
-            from azure.identity import AzureCliCredential, DefaultAzureCredential
+            from governance.credentials import credential as build_credential
 
-            # AzureCliCredential when a developer is signed in with `az login`,
-            # which is the demo case and avoids DefaultAzureCredential probing
-            # every source in turn while an audience watches.
-            if os.getenv("AZURE_USE_CLI_CREDENTIAL", "true").strip().lower() in (
-                "true", "1", "yes", "on",
-            ):
-                self._credential = AzureCliCredential()
-            else:
-                self._credential = DefaultAzureCredential()
+            self._credential = build_credential()
         return self._credential
 
     def _resource_token(self) -> tuple[str, float]:

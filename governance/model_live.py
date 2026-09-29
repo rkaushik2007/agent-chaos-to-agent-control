@@ -48,14 +48,9 @@ def foundry_chat_client(credential=None):
     from agent_framework.foundry import FoundryChatClient
 
     if credential is None:
-        from azure.identity.aio import AzureCliCredential, DefaultAzureCredential
+        from governance.credentials import async_credential
 
-        credential = (
-            AzureCliCredential()
-            if os.getenv("AZURE_USE_CLI_CREDENTIAL", "true").strip().lower()
-            in ("true", "1", "yes", "on")
-            else DefaultAzureCredential()
-        )
+        credential = async_credential()
 
     _client = FoundryChatClient(
         project_endpoint=project_endpoint,
